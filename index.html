@@ -22,6 +22,7 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 :root{
   --bg:#f5f1f2; --surface:#ffffff; --surface2:#efe8ea; --fg:#241a1e; --muted:#6e6065; --line:#e1d6da;
   --accent:#8a2d52; --accent-fg:#ffffff; --accent-soft:#f4e4eb;
+  --c-ein:#8a2d52;--c-aus:#2f6fb0;
   --ok:#2e7a4d; --ok-soft:#e3f1e8; --warn:#9a6210; --warn-soft:#f8ecd6; --bad:#b1261e; --bad-soft:#f8e2e0;
   --f-display:"Fraunces", Georgia, "Times New Roman", serif;
   --f-body:"Figtree", -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -30,11 +31,11 @@ body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#151113; --surface:#1f191c; --surface2:#2a2226; --fg:#f2eaed; --muted:#b2a2a8; --line:#3a2f34;
   --accent:#e27ba4; --accent-fg:#1c0f15; --accent-soft:#3a2230;
-  --ok:#6cc18c; --ok-soft:#1e3326; --warn:#e2a74c; --warn-soft:#3a2d17; --bad:#f08a82; --bad-soft:#3d1f1d; color-scheme:dark}}
+  --c-ein:#c95a88;--c-aus:#4f8fd0;--ok:#6cc18c; --ok-soft:#1e3326; --warn:#e2a74c; --warn-soft:#3a2d17; --bad:#f08a82; --bad-soft:#3d1f1d; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#151113; --surface:#1f191c; --surface2:#2a2226; --fg:#f2eaed; --muted:#b2a2a8; --line:#3a2f34;
   --accent:#e27ba4; --accent-fg:#1c0f15; --accent-soft:#3a2230;
-  --ok:#6cc18c; --ok-soft:#1e3326; --warn:#e2a74c; --warn-soft:#3a2d17; --bad:#f08a82; --bad-soft:#3d1f1d; color-scheme:dark}
+  --c-ein:#c95a88;--c-aus:#4f8fd0;--ok:#6cc18c; --ok-soft:#1e3326; --warn:#e2a74c; --warn-soft:#3a2d17; --bad:#f08a82; --bad-soft:#3d1f1d; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
 h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
@@ -196,6 +197,14 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 .pthumb.ph{display:grid;place-items:center;font:600 1.3rem var(--f-display);color:var(--muted)}
 .pthumb.big{width:110px;height:110px}
 .role-user [data-act=storno],.role-user [data-act=kunde-del],.role-user [data-act=besuch-del],.role-user [data-act=artikel-del]{display:none!important}
+.chart svg{width:100%;height:auto;display:block}
+.chart .grid{stroke:var(--line);stroke-width:1}.chart .axis{stroke:var(--muted);stroke-width:1}
+.chart .tick{fill:var(--muted);font:500 11px var(--f-body);font-variant-numeric:tabular-nums}
+.chart .c-ein{fill:var(--c-ein)}.chart .c-aus{fill:var(--c-aus)}.chart .hit{fill:transparent;cursor:pointer}.chart .hit:hover{fill:var(--fg);fill-opacity:.05}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}.legend span{display:flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px}.sw.c-ein{background:var(--c-ein)}.sw.c-aus{background:var(--c-aus)}
+#ctip{position:fixed;z-index:60;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:8px;padding:8px 10px;font-size:.85rem;line-height:1.35;font-variant-numeric:tabular-nums}
+.wtab td{vertical-align:middle}.wtab input{min-height:48px;font-size:1.1rem;text-align:right;font-variant-numeric:tabular-nums}
 .lockbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;font-weight:600;cursor:pointer}
 </style>
 </head><body>
@@ -231,7 +240,7 @@ const parseDate=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Da
 const addDays=(s,n)=>{const d=parseDate(s);d.setDate(d.getDate()+n);return isoDate(d)};
 const fmtDate=s=>s?parseDate(s).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
 const fmtDateLong=s=>parseDate(s).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-const fmtTs=ts=>{const d=new Date(ts);return d.toLocaleDateString('de-DE')+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+const fmtTs=ts=>new Date(ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
 const eur=c=>((c||0)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
 const eurPlain=c=>((c||0)/100).toFixed(2).replace('.',',');
 const parseEur=s=>{if(s==null)return NaN;s=String(s).trim().replace(/\s|€/g,'');if(!s)return NaN;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const v=Number(s);return isFinite(v)?Math.round(v*100):NaN};
@@ -413,7 +422,7 @@ const SHELL={
    <button class="btn primary" data-act="scan-lager">Barcode scannen</button><button class="btn" data-act="artikel-neu">+ Artikel</button><button class="btn" data-act="inventur-csv">Inventurliste (CSV)</button></div></div>
    <div class="fields" style="margin-bottom:14px"><input type="search" id="lager-suche" placeholder="Suchen: Name, Marke, Farbnummer oder EAN" value="${esc(UI.lagerSuche)}" aria-label="Artikel suchen">
    <select id="lager-kat" aria-label="Kategorie"><option value="">Alle Kategorien</option>${ART_KAT.map(k=>`<option ${UI.lagerKat===k?'selected':''}>${k}</option>`).join('')}</select></div><div id="body"></div>`,
- kasse:()=>`<div class="seg" role="group" aria-label="Bereich" style="margin-bottom:16px;flex-wrap:wrap">${[['tag','Tageseinnahmen'],['aus','Ausgaben'],['buch','Kassenbuch'],['belege','Belege'],['euer','EÜR / Jahr'],['abschl','Kassenstürze']].map(([k,l])=>`<button data-act="kasse-tab" data-v="${k}" aria-pressed="${UI.kasseTab===k}">${l}</button>`).join('')}</div><div id="body"></div>`,
+ kasse:()=>`<div class="seg" role="group" aria-label="Bereich" style="margin-bottom:16px;flex-wrap:wrap">${[['tag','Einnahmen'],['aus','Ausgaben'],['buch','Kassenbuch'],['belege','Belege'],['euer','EÜR / Jahr'],['abschl','Kassenstürze']].map(([k,l])=>`<button data-act="kasse-tab" data-v="${k}" aria-pressed="${UI.kasseTab===k}">${l}</button>`).join('')}</div><div id="body"></div>`,
  mehr:()=>`<div class="view-head"><h1>${isAdmin()?'Einstellungen':'Mehr'}</h1><div class="actions"><button class="btn" data-act="logout">Abmelden</button></div></div><div id="body"></div>`
 };
 
@@ -498,7 +507,7 @@ mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px"
   ${usersCard()}
   <div class="card legal"><h3>Rechtliche Hinweise (Stand 2026)</h3>
    <p><b>Kleinunternehmerregelung (§ 19 UStG):</b> Es wird keine Umsatzsteuer ausgewiesen. Jede Quittung trägt automatisch den Hinweis „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ Grenzen: Umsatz im Vorjahr höchstens 25.000 €, im laufenden Jahr höchstens 100.000 €. Wird im laufenden Jahr 100.000 € überschritten, endet die Regelung sofort. Die Auswertung unter Kasse → EÜR zeigt den Stand.</p>
-   <p><b>Kasse:</b> Diese App ist ein digitales Kassenbuch für eine <b>offene Ladenkasse</b> und keine zertifizierte Registrierkasse mit TSE. Führen Sie täglich einen Tagesabschluss mit Zählung durch. Buchungen lassen sich nicht löschen oder ändern, nur stornieren; die Belegnummern laufen pro Jahr fortlaufend. Ob diese Form der Kassenführung für Ihren Betrieb anerkannt ist, klären Sie bitte mit Ihrer Steuerberatung oder dem Finanzamt.</p>
+   <p><b>Kasse:</b> Die gesetzliche Kasse (mit TSE) ist Ihr separates Kassensystem. Dieses Kassenbuch dient der eigenen Übersicht über Einnahmen, Ausgaben und Gewinn; Buchungen können jederzeit bearbeitet werden. Führen Sie täglich einen Tagesabschluss mit Zählung durch. Buchungen lassen sich nicht löschen oder ändern, nur stornieren; die Belegnummern laufen pro Jahr fortlaufend. Ob diese Form der Kassenführung für Ihren Betrieb anerkannt ist, klären Sie bitte mit Ihrer Steuerberatung oder dem Finanzamt.</p>
    <p><b>Quittungen:</b> Bis 250 € genügt eine Kleinbetragsrechnung. Darüber sind Name und Anschrift der Kundin nötig – bitte in der Kundenkarte hinterlegen.</p>
    <p><b>Aufbewahrung:</b> Kassenbuch, Rechnungen und Belege 8 bzw. 10 Jahre aufbewahren. Täglich die Datensicherung erstellen und in OneDrive ablegen.</p>
    <p><b>Datenschutz (DSGVO):</b> Fotos von Kundinnen nur mit Einwilligung speichern (Häkchen in der Kundenkarte). Auf Wunsch lässt sich eine Kundenkarte samt Fotos löschen. Alle Daten liegen ausschließlich auf diesem iPad und in Ihren eigenen Sicherungsdateien – nicht im Internet.</p>
@@ -530,16 +539,43 @@ function kundeDetail(k){
 
 function kasseBuch(){
   const m=UI.kasseMonat;const sm=stornoMap();
-  const list=S.kasse.filter(k=>ymOf(k.datum)===m).sort((a,b)=>a.datum===b.datum?(a.nr<b.nr?-1:1):a.datum<b.datum?-1:1);
+  const list=S.kasse.filter(k=>ymOf(k.datum)===m).sort((a,b)=>a.datum===b.datum?((a.ts||'')<(b.ts||'')?-1:1):a.datum<b.datum?-1:1);
   const ein=list.filter(k=>k.art==='einnahme'&&!isPrivat(k)).reduce((s,k)=>s+k.betrag,0);
   const aus=list.filter(k=>k.art==='ausgabe'&&!isPrivat(k)).reduce((s,k)=>s+k.betrag,0);
   const months=[...new Set([ymOf(today()),...S.kasse.map(k=>ymOf(k.datum))])].sort().reverse();
   return `<div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Einnahmen im Monat</span><b>${eur(ein)}</b></div><div class="card stat"><span class="label">Ausgaben im Monat</span><b>${eur(aus)}</b></div><div class="card stat"><span class="label">${ein-aus<0?'Verlust':'Gewinn'} im Monat</span><b class="${ein-aus<0?'minus':'plus'}">${eur(ein-aus)}</b></div><div class="card stat"><span class="label">Barbestand aktuell</span><b>${eur(barbestand())}</b></div></div>
   <div class="card"><div class="view-head" style="margin-bottom:8px"><select id="kasse-monat" style="width:auto" aria-label="Monat">${months.map(x=>`<option value="${x}" ${x===m?'selected':''}>${parseDate(x+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</option>`).join('')}</select>
    <span class="actions"><button class="btn sm" data-act="monat-pdf">Monatsabschluss (PDF)</button><button class="btn sm" data-act="export-kasse-monat">Monat als CSV</button></span></div>
-  ${list.length?`<div class="table-wrap"><table><thead><tr><th>Beleg</th><th>Datum</th><th>Text</th><th>Zahlart</th><th class="num">Betrag</th><th></th></tr></thead><tbody>${list.map(k=>{const st=sm[k.nr];
-   return `<tr class="${st?'storno':''}"><td class="num" style="text-align:left">${esc(k.nr)}</td><td>${fmtDate(k.datum)}</td><td>${esc(k.text)}<div class="small muted">${esc(k.kategorie)}${k.kundeName?' · '+esc(k.kundeName):''}${st?' · storniert durch '+esc(st):''}</div></td><td>${ZAHLART[k.zahlart]||''}</td><td class="num ${k.art==='einnahme'?'plus':'minus'}">${k.art==='einnahme'?'+':'−'} ${eur(Math.abs(k.betrag)).replace('-','')}${k.betrag<0?' (Storno)':''}</td>
-   <td style="white-space:nowrap">${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg (${belegeOf(k).length})</button> `:k.art==='ausgabe'&&!k.stornoVon?`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button> `:''}${!st&&!k.stornoVon?`<button class="btn sm danger" data-act="storno" data-nr="${k.nr}">Storno</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">In diesem Monat noch keine Buchungen.</div>'}</div>`;
+  ${list.length?`<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Text</th><th>Zahlart</th><th class="num">Betrag</th><th></th></tr></thead><tbody>${list.map(k=>{const st=sm[k.nr];
+   return `<tr class="${st?'storno':''}"><td style="white-space:nowrap">${fmtDate(k.datum)}</td><td>${esc(k.text)}<div class="small muted">${esc(k.kategorie)}${k.kundeName?' · '+esc(k.kundeName):''}${st?' · storniert durch '+esc(st):''}</div></td><td>${ZAHLART[k.zahlart]||''}</td><td class="num ${k.art==='einnahme'?'plus':'minus'}">${k.art==='einnahme'?'+':'−'} ${eur(Math.abs(k.betrag)).replace('-','')}${k.betrag<0?' (Storno)':''}</td>
+   <td style="white-space:nowrap">${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg (${belegeOf(k).length})</button> `:k.art==='ausgabe'&&!k.stornoVon?`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button> `:''}<button class="btn sm" data-act="buchung-edit" data-id="${k.id}">Bearbeiten</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">In diesem Monat noch keine Buchungen.</div>'}</div>`;
+}
+function chartMonate(y,L){
+  const MON=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const d=MON.map((n,i)=>{const mk=y+'-'+pad(i+1);const ML=L.filter(k=>ymOf(k.datum)===mk&&!isPrivat(k));
+    const e=ML.filter(k=>k.art==='einnahme').reduce((a,k)=>a+k.betrag,0),a=ML.filter(k=>k.art==='ausgabe').reduce((s,k)=>s+k.betrag,0);return {n,mk,e,a,g:e-a}});
+  if(!d.some(x=>x.e||x.a))return '';
+  const W=720,H=230,l=58,r=10,t=14,b=26,iw=W-l-r,ih=H-t-b,gw=iw/12;
+  const nice=v=>{if(v<=0)return 100;const p=Math.pow(10,Math.floor(Math.log10(v)));const m=v/p;return (m<=1?1:m<=2?2:m<=5?5:10)*p};
+  const ax=x=>(x/100).toLocaleString('de-DE',{maximumFractionDigits:0})+' €';
+  const top=nice(Math.max(...d.map(x=>Math.max(x.e,x.a))));const ys=v=>t+ih-(v/top)*ih;
+  const bar=(x,w,v,cls)=>{if(v<=0)return '';const y0=t+ih,y1=ys(v),h=y0-y1,rr=Math.min(4,h,w/2);return `<path class="${cls}" d="M${x},${y0}V${y1+rr}Q${x},${y1} ${x+rr},${y1}H${x+w-rr}Q${x+w},${y1} ${x+w},${y1+rr}V${y0}Z"/>`};
+  const bw=Math.min(18,(gw-10)/2);
+  let g1=[0,.25,.5,.75,1].map(f=>`<line class="grid" x1="${l}" x2="${W-r}" y1="${ys(top*f)}" y2="${ys(top*f)}"/><text class="tick" x="${l-6}" y="${ys(top*f)+4}" text-anchor="end">${ax(top*f)}</text>`).join('');
+  g1+=d.map((x,i)=>{const cx=l+gw*i+gw/2;return bar(cx-bw-1,bw,x.e,'c-ein')+bar(cx+1,bw,x.a,'c-aus')+`<text class="tick" x="${cx}" y="${H-8}" text-anchor="middle">${x.n}</text><rect class="hit" x="${l+gw*i}" y="${t}" width="${gw}" height="${ih}" data-tip="<b>${x.n} ${y}</b><br>Einnahmen ${eur(x.e)}<br>Ausgaben ${eur(x.a)}<br>${x.g<0?'Verlust':'Gewinn'} ${eur(x.g)}"/>`}).join('');
+  const gm=Math.max(...d.map(x=>Math.abs(x.g)));const gtop=nice(gm);const H2=170,ih2=H2-t-b,z=t+ih2/2,gy=v=>z-(v/gtop)*(ih2/2);
+  let g2=[-1,0,1].map(f=>`<line class="${f===0?'axis':'grid'}" x1="${l}" x2="${W-r}" y1="${gy(gtop*f)}" y2="${gy(gtop*f)}"/><text class="tick" x="${l-6}" y="${gy(gtop*f)+4}" text-anchor="end">${ax(gtop*f)}</text>`).join('');
+  const gb=Math.min(28,gw-12);
+  g2+=d.map((x,i)=>{const cx=l+gw*i+gw/2;let p='';if(x.g){const y1=gy(x.g),h=Math.abs(y1-z),rr=Math.min(4,h,gb/2),x0=cx-gb/2;
+     p=x.g>0?`<path class="c-ein" d="M${x0},${z}V${y1+rr}Q${x0},${y1} ${x0+rr},${y1}H${x0+gb-rr}Q${x0+gb},${y1} ${x0+gb},${y1+rr}V${z}Z"/>`:`<path class="c-aus" d="M${x0},${z}V${y1-rr}Q${x0},${y1} ${x0+rr},${y1}H${x0+gb-rr}Q${x0+gb},${y1} ${x0+gb},${y1-rr}V${z}Z"/>`}
+    return p+`<text class="tick" x="${cx}" y="${H2-8}" text-anchor="middle">${x.n}</text><rect class="hit" x="${l+gw*i}" y="${t}" width="${gw}" height="${ih2}" data-tip="<b>${x.n} ${y}</b><br>${x.g<0?'Verlust':'Gewinn'} ${eur(x.g)}"/>`}).join('');
+  const jg=d.reduce((a,x)=>a+x.g,0);
+  return `<div class="card chart" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">Einnahmen und Ausgaben ${esc(y)}</h3>
+    <div class="legend"><span><i class="sw c-ein"></i>Einnahmen</span><span><i class="sw c-aus"></i>Ausgaben</span></div></div>
+   <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Einnahmen und Ausgaben je Monat ${esc(y)}">${g1}</svg>
+   <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-top:6px"><h3 style="margin:0">Gewinn / Verlust je Monat</h3><span class="small">Jahr ${esc(y)}: <b class="${jg<0?'minus':'plus'}">${jg<0?'Verlust':'Gewinn'} ${eur(jg)}</b></span></div>
+   <div class="legend"><span><i class="sw c-ein"></i>Gewinn (über der Linie)</span><span><i class="sw c-aus"></i>Verlust (unter der Linie)</span></div>
+   <svg viewBox="0 0 ${W} ${H2}" role="img" aria-label="Gewinn oder Verlust je Monat ${esc(y)}">${g2}</svg></div>`;
 }
 function kasseEuer(){
   const y=UI.euerJahr;const L=S.kasse.filter(k=>String(k.datum).startsWith(y));
@@ -553,6 +589,7 @@ function kasseEuer(){
   return `<div class="view-head"><select id="euer-jahr" style="width:auto" aria-label="Jahr">${years.map(x=>`<option ${x===y?'selected':''}>${x}</option>`).join('')}</select><button class="btn sm" data-act="export-kasse-jahr">Jahr als CSV für Steuerberatung</button></div>
   <div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Betriebseinnahmen</span><b>${eur(tE)}</b></div><div class="card stat"><span class="label">Betriebsausgaben</span><b>${eur(tA)}</b></div><div class="card stat"><span class="label">Gewinn (EÜR)</span><b class="${tE-tA<0?'minus':''}">${eur(tE-tA)}</b></div></div>
   <div class="grid g2" style="margin-bottom:16px"><div class="card"><h3>Einnahmen nach Art</h3>${tbl(E)}</div><div class="card"><h3>Ausgaben nach Art</h3>${tbl(A)}</div></div>
+  ${chartMonate(y,L)}
   <div class="card" style="margin-bottom:16px"><h3>Gewinn / Verlust nach Monaten</h3><div class="table-wrap"><table><thead><tr><th>Monat</th><th class="num">Einnahmen</th><th class="num">Ausgaben</th><th class="num">Ergebnis</th></tr></thead><tbody>${[...Array(12)].map((_,i)=>{const mk=y+'-'+pad(i+1);const ML=L.filter(k=>ymOf(k.datum)===mk&&!isPrivat(k));
     const e=ML.filter(k=>k.art==='einnahme').reduce((a,k)=>a+k.betrag,0),a=ML.filter(k=>k.art==='ausgabe').reduce((s,k)=>s+k.betrag,0);if(!ML.length)return '';
     return `<tr><td>${parseDate(mk+'-01').toLocaleDateString('de-DE',{month:'long'})}</td><td class="num">${eur(e)}</td><td class="num">${eur(a)}</td><td class="num ${e-a<0?'minus':'plus'}">${e-a<0?'Verlust ':'Gewinn '}${eur(e-a)}</td></tr>`}).join('')||'<tr><td colspan="4" class="muted">Noch keine Buchungen in diesem Jahr.</td></tr>'}
@@ -710,36 +747,44 @@ function kasseFormHtml(art,pre={}){
    <div class="field"><label for="f-ktext">Buchungstext${ein?' (optional)':''}</label><input id="f-ktext" name="text" value="${esc(pre.text||'')}" placeholder="${ein?'wird aus den Leistungen übernommen':'z. B. Farben Großhandel, Rechnung 4711'}"></div>
    ${assets?`<div class="field"><span class="label">Rechnung / Beleg (Foto oder PDF, bis 4 Seiten)</span>${art==='ausgabe'?'<span class="small muted" id="ocr-status">Foto der Rechnung aufnehmen – Betrag, Datum und Firma werden automatisch gelesen.</span>':''}<div class="thumbs" id="k-thumbs"></div><label class="btn" style="align-self:flex-start">Beleg fotografieren / wählen<input type="file" accept="image/*,application/pdf" id="k-beleg" multiple hidden></label></div>`:''}
    ${inl?`<button class="btn primary pos-go">${ein?'Kassieren':'Ausgabe buchen'}</button>`:`<div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Buchen</button></div>`}
-   <p class="small muted" style="margin:0">Buchungen können später nicht geändert, nur storniert werden. Belege lassen sich jederzeit nachreichen.</p></form>`;
+   <p class="small muted" style="margin:0">Buchungen lassen sich jederzeit im Kassenbuch bearbeiten. Belege lassen sich nachreichen.</p></form>`;
 }
 function kasseForm(art,pre={}){belegFiles=[];openModal(art==='einnahme'?'Einnahme buchen':'Ausgabe buchen',kasseFormHtml(art,pre))}
+const wocheStart=d=>addDays(d,-((parseDate(d).getDay()+6)%7));
+const tagWert=(d,z)=>S.kasse.filter(k=>k.datum===d&&k.tagesEinnahme&&k.zahlart===z&&!k.stornoVon).reduce((a,k)=>a+k.betrag,0);
 function kasseTag(){
-  const d=UI.tagDatum||today();const sm=stornoMap();
-  const vorh=S.kasse.filter(k=>k.datum===d&&k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr]);
-  const abgeschl=S.abschluesse.find(a=>a.datum===d);
-  const barAusg=S.kasse.filter(k=>k.datum===d&&k.zahlart==='bar'&&!k.tagesEinnahme&&k.kategorie!=='Kassendifferenz');
-  const letzte=S.abschluesse.filter(a=>a.datum<d).sort((a,b)=>a.datum<b.datum?1:-1)[0];
-  const tage=[...new Set(S.kasse.filter(k=>k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr]).map(k=>k.datum))].sort().reverse().slice(0,10);
-  return `<div class="pos"><div class="card grid" style="gap:14px"><h2>Tageseinnahmen</h2>${UI.askBackup?'<div class="notice ok" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><span>Gespeichert. Jetzt noch die Tagessicherung erstellen?</span><button class="btn sm primary" data-act="sicherung">Sicherung erstellen</button></div>':''}
-   ${vorh.length?`<div class="notice ok">Für den ${fmtDate(d)} sind die Einnahmen bereits eingetragen: ${vorh.map(k=>`${ZAHLART[k.zahlart]} <b>${eur(k.betrag)}</b>`).join(' · ')}. Bei einem Fehler im Kassenbuch stornieren und neu eintragen.</div>`:
-   `<form data-form="tag" class="grid" style="gap:14px">
-    ${fld('datum','Datum',d,'date')}
-    <div class="fields"><div class="field"><label for="f-bar">Bar-Einnahmen (€)</label><input id="f-bar" name="bar" inputmode="decimal" placeholder="0,00" class="big-in"></div>
-    <div class="field"><label for="f-karte">Karte – SumUp Tagesumsatz (€)</label><input id="f-karte" name="karte" inputmode="decimal" placeholder="0,00" class="big-in"></div></div>
-    <div class="field"><label for="f-gezaehlt">Bargeld in der Kasse gezählt (€) – Kassensturz</label><input id="f-gezaehlt" name="gezaehlt" inputmode="decimal" placeholder="0,00"><span class="small muted" id="tag-check">Sollbestand wird nach Eingabe der Bar-Einnahmen berechnet.</span></div>
-    ${fld('notiz','Notiz (optional)','')}
-    ${assets?`<div class="field"><span class="label">SumUp-Tagesbericht / Zettel fotografieren (optional)</span><div class="thumbs" id="k-thumbs"></div><label class="btn" style="align-self:flex-start">Foto aufnehmen / wählen<input type="file" accept="image/*,application/pdf" id="k-beleg" multiple hidden></label></div>`:''}
-    <button class="btn primary pos-go">Tageseinnahmen speichern</button>
-    <p class="small muted" style="margin:0">Barausgaben von heute (${eur(barAusg.filter(k=>k.art==='ausgabe').reduce((s,k)=>s+k.betrag,0))}) sind im Sollbestand schon berücksichtigt. Kartenzahlungen landen über SumUp auf dem Konto.</p></form>`}
-   </div>
-   <div class="card"><h3>Kasse</h3><div class="grid g2" style="gap:10px;margin-bottom:10px">
-    <div><div class="label">Barbestand laut Buch</div><b class="num">${eur(barbestand())}</b></div>
-    <div><div class="label">Letzter Kassensturz</div><b>${letzte||abgeschl?fmtDate((abgeschl||letzte).datum):'–'}</b></div></div>
-    <div class="label" style="margin-bottom:4px">Zuletzt eingetragen</div>
-    ${tage.length?`<div class="list">${tage.map(t=>{const L=S.kasse.filter(k=>k.datum===t&&k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr]);const g=L.reduce((a,k)=>a+k.betrag,0);
-      return `<div class="row"><div class="grow"><div class="title">${fmtDate(t)}</div><div class="small muted">${L.map(k=>ZAHLART[k.zahlart]+' '+eur(k.betrag)).join(' · ')}</div></div><b class="num">${eur(g)}</b></div>`}).join('')}</div>`:'<div class="empty" style="padding:14px">Noch keine Tageseinnahmen.</div>'}
-    <div class="actions" style="margin-top:10px"><button class="btn" data-act="ausgabe-page" style="flex:1">Ausgabe buchen</button></div></div></div>`;
+  const mo=UI.tagWoche||wocheStart(today());const days=[...Array(7)].map((_,i)=>addDays(mo,i));const ruhe=ruhetage();
+  const zeig=days.filter(d=>!ruhe.includes(parseDate(d).getDay())||tagWert(d,'bar')||tagWert(d,'karte'));
+  const wsum=days.reduce((a,d)=>a+tagWert(d,'bar')+tagWert(d,'karte'),0);
+  const m=ymOf(today());const mE=S.kasse.filter(k=>ymOf(k.datum)===m&&k.tagesEinnahme);const mB=mE.filter(k=>k.zahlart==='bar').reduce((a,k)=>a+k.betrag,0),mK=mE.filter(k=>k.zahlart==='karte').reduce((a,k)=>a+k.betrag,0);
+  const val=c=>c?eurPlain(c):'';
+  return `<div class="pos"><div class="card grid" style="gap:14px">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Einnahmen der Woche</h2>
+    <div class="actions"><button class="btn sm" data-act="woche-prev" aria-label="Vorige Woche">‹</button><span class="small" style="align-self:center"><b>${fmtDate(mo)} – ${fmtDate(addDays(mo,6))}</b></span><button class="btn sm" data-act="woche-next" aria-label="Nächste Woche">›</button><button class="btn sm" data-act="woche-heute">Diese Woche</button></div></div>
+   ${UI.askBackup?'<div class="notice ok" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><span>Gespeichert. Jetzt noch die Sicherung erstellen?</span><button class="btn sm primary" data-act="sicherung">Sicherung erstellen</button></div>':''}
+   <form data-form="tag" data-days="${zeig.join(',')}" class="grid" style="gap:12px"><div class="table-wrap"><table class="wtab"><thead><tr><th>Tag</th><th class="num">Bar (€)</th><th class="num">Karte (€)</th></tr></thead><tbody>
+    ${zeig.map(d=>`<tr><td style="white-space:nowrap"><b>${parseDate(d).toLocaleDateString('de-DE',{weekday:'short'})}</b> ${fmtDate(d).slice(0,6)}</td>
+     <td><input name="bar_${d}" inputmode="decimal" placeholder="0,00" value="${val(tagWert(d,'bar'))}" aria-label="Bar ${fmtDate(d)}"></td>
+     <td><input name="karte_${d}" inputmode="decimal" placeholder="0,00" value="${val(tagWert(d,'karte'))}" aria-label="Karte ${fmtDate(d)}"></td></tr>`).join('')}
+   </tbody></table></div>
+   <div class="small">Woche gesamt: <b class="num" id="woche-sum">${eur(wsum)}</b></div>
+   <button class="btn primary pos-go">Speichern</button>
+   <p class="small muted" style="margin:0">Beträge können jederzeit geändert werden – einfach überschreiben und speichern. Leeres Feld = keine Einnahme. Ruhetage werden ausgeblendet.</p></form></div>
+   <div class="card"><h3>${parseDate(m+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</h3><div class="grid g2" style="gap:10px;margin-bottom:10px">
+    <div><div class="label">Bar</div><b class="num">${eur(mB)}</b></div><div><div class="label">Karte</div><b class="num">${eur(mK)}</b></div>
+    <div><div class="label">Einnahmen gesamt</div><b class="num">${eur(mB+mK)}</b></div><div><div class="label">Barbestand laut Buch</div><b class="num">${eur(barbestand())}</b></div></div>
+    <div class="actions" style="margin-top:10px"><button class="btn" data-act="ausgabe-page" style="flex:1">Ausgabe buchen</button><button class="btn" data-act="kasse-tab" data-v="euer" style="flex:1">Gewinn / Verlust</button></div></div></div>`;
 }
+function tagCheck(){const f=$('form[data-form=tag]');const el=$('#woche-sum');if(!f||!el)return;let s=0;f.querySelectorAll('input').forEach(i=>{const v=parseEur(i.value);if(v>0)s+=v});el.textContent=eur(s)}
+function buchungForm(k){const KAT=[...new Set([...EIN_KAT,'Tageseinnahmen bar','Tageseinnahmen Karte (SumUp)',...AUS_KAT,'Kassendifferenz',k.kategorie])];
+  openModal('Buchung bearbeiten',`<form data-form="buchung" data-id="${k.id}" class="grid" style="gap:12px"><div class="fields">
+   ${fld('datum','Datum',k.datum,'date')}
+   <div class="field"><label for="f-art">Art</label><select id="f-art" name="art"><option value="einnahme" ${k.art==='einnahme'?'selected':''}>Einnahme</option><option value="ausgabe" ${k.art==='ausgabe'?'selected':''}>Ausgabe</option></select></div>
+   <div class="field"><label for="f-zahlart">Zahlart</label><select id="f-zahlart" name="zahlart">${Object.entries(ZAHLART).map(([v,l])=>`<option value="${v}" ${k.zahlart===v?'selected':''}>${l}</option>`).join('')}</select></div>
+   ${fld('betrag','Betrag (€)',eurPlain(Math.abs(k.betrag)),'text','inputmode="decimal"')}
+   <div class="field"><label for="f-kat2">Kategorie</label><select id="f-kat2" name="kategorie">${KAT.map(c=>`<option ${k.kategorie===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div></div>
+   ${fld('text','Text',k.text)}
+   <div class="modal-foot">${isAdmin()?`<button type="button" class="btn danger" data-act="buchung-del" data-id="${k.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`)}
 function kasseAus(){
   const m=ymOf(today());const sm=stornoMap();
   const list=S.kasse.filter(k=>ymOf(k.datum)===m&&k.art==='ausgabe'&&k.kategorie!=='Kassendifferenz').sort((a,b)=>a.nr<b.nr?1:-1);
@@ -749,11 +794,8 @@ function kasseAus(){
    ${last?`<div class="notice ok">Beleg <b>${esc(last.nr)}</b> über <b>${eur(last.betrag)}</b> gebucht.</div>`:''}
    <div id="pos-form">${kasseFormHtml('ausgabe',{inline:true,kategorie:'Wareneinkauf',zahlart:'ueberweisung'})}</div></div>
    <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h3 style="margin:0">Ausgaben ${parseDate(m+'-01').toLocaleDateString('de-DE',{month:'long'})}</h3><b class="num">${eur(sum)}</b></div>
-    ${list.length?`<div class="list">${list.map(k=>`<div class="row"><div class="grow"><div class="title ${sm[k.nr]||k.stornoVon?'muted':''}">${esc(k.text)}</div><div class="small muted">${fmtDate(k.datum)} · ${esc(k.kategorie)} · ${ZAHLART[k.zahlart]||''}${sm[k.nr]?' · storniert':''}</div></div><span class="num minus">${eur(k.betrag)}</span>${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg</button>`:k.stornoVon?'':`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button>`}</div>`).join('')}</div>`:'<div class="empty" style="padding:14px">In diesem Monat noch keine Ausgaben.</div>'}</div></div>`;
+    ${list.length?`<div class="list">${list.map(k=>`<div class="row"><div class="grow"><div class="title ${sm[k.nr]||k.stornoVon?'muted':''}">${esc(k.text)}</div><div class="small muted">${fmtDate(k.datum)} · ${esc(k.kategorie)} · ${ZAHLART[k.zahlart]||''}${sm[k.nr]?' · storniert':''}</div></div><span class="num minus">${eur(k.betrag)}</span><button class="btn sm" data-act="buchung-edit" data-id="${k.id}">Bearbeiten</button>${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg</button>`:k.stornoVon?'':`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button>`}</div>`).join('')}</div>`:'<div class="empty" style="padding:14px">In diesem Monat noch keine Ausgaben.</div>'}</div></div>`;
 }
-function tagCheck(){const el=$('#tag-check');if(!el)return;const bar=parseEur($('#f-bar').value)||0;const gz=parseEur($('#f-gezaehlt').value);
-  const soll=barbestand()+bar;if(isNaN(gz)){el.innerHTML=`Sollbestand: <b>${eur(soll)}</b>`;return}
-  const df=gz-soll;el.innerHTML=`Sollbestand ${eur(soll)} · gezählt ${eur(gz)} · `+(df===0?'<span class="pill ok">stimmt</span>':`<span class="pill ${df<0?'bad':'warn'}">Differenz ${eur(df)}</span>`)}
 /* PIN-Schutz für Einstellungen */
 async function pinHash(pin){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('seen-salon:'+pin));return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function lockScreen(mode){const app=mode==='app';const neu=!S.settings.pinHash&&!app;const pin=UI.pin||'';
@@ -907,6 +949,11 @@ const ACT={
  'sicherung-voll':()=>sicherungErstellen(true).catch(e=>{console.error(e);toast('Sicherung fehlgeschlagen.')}),
  'monat-pdf':()=>saveFile('Monatsabschluss_'+UI.kasseMonat+'.pdf',monatsPDF(UI.kasseMonat)),
  'logout':()=>abmelden(),
+ 'buchung-edit':el=>{const k=S.kasse.find(x=>x.id===el.dataset.id);if(k)buchungForm(k)},
+ 'buchung-del':el=>{const k=S.kasse.find(x=>x.id===el.dataset.id);if(!k)return;confirmBox('Buchung löschen',`„${esc(k.text)}“ vom ${fmtDate(k.datum)} über ${eur(k.betrag)} löschen?`,'Löschen',async()=>{await mutate('kasse/'+ymOf(k.datum),d=>{d.entries=(d.entries||[]).filter(x=>x.id!==k.id);return d});for(const b of belegeOf(k))assets.delete(b.id).catch(()=>{});toast('Gelöscht')})},
+ 'woche-prev':()=>{UI.tagWoche=addDays(UI.tagWoche||wocheStart(today()),-7);UI.askBackup=false;renderBody()},
+ 'woche-next':()=>{UI.tagWoche=addDays(UI.tagWoche||wocheStart(today()),7);UI.askBackup=false;renderBody()},
+ 'woche-heute':()=>{UI.tagWoche=wocheStart(today());renderBody()},
  'login-sel':el=>{UI.loginSel=el.dataset.id;UI.loginPin='';renderBody()},
  'login-key':el=>{const k=el.dataset.k;if(k==='⌫')UI.loginPin=(UI.loginPin||'').slice(0,-1);else if((UI.loginPin||'').length<4)UI.loginPin=(UI.loginPin||'')+k;renderBody();if((UI.loginPin||'').length===4)loginPruefen()},
  'login-bio':()=>{const u=users().find(x=>x.id===(UI.loginSel||(users().length===1?users()[0].id:null)));if(u&&u.cred)bioAnmelden(u)},
@@ -941,7 +988,7 @@ document.addEventListener('input',e=>{
   if(t.id==='kunden-suche'){UI.kundenSuche=t.value;renderBody()}
   else if(t.id==='lager-suche'){UI.lagerSuche=t.value;renderBody()}
   else if(t.id==='pos-kunde'){UI.pos.kundeText=t.value;const k=kundeFromLabel(t.value);UI.pos.kundeId=k?k.id:'';const m=$('#pos-email');if(k&&k.email&&m&&!m.value){m.value=k.email;UI.pos.email=k.email}}
-  else if(t.id==='f-bar'||t.id==='f-gezaehlt')tagCheck();
+  else if(t.closest&&t.closest('form[data-form=tag]'))tagCheck();
   else if(t.dataset.vi!=null){pending.verbrauch[Number(t.dataset.vi)].menge=num(t.value)}
 });
 document.addEventListener('change',e=>{
@@ -1001,20 +1048,25 @@ const FORMS={
    if(f.dataset.id){await db.doc('artikel/'+f.dataset.id).update(data)}
    else{const id=uid();await db.doc('artikel/'+id).set({...data,bestand:0});const st=num(v.bestand);if(st)await lagerBewegung(id,st,'zugang','Anfangsbestand')}
    toast('Artikel gespeichert')},
- async tag(f){const v=Object.fromEntries(new FormData(f));const bar=parseEur(v.bar)||0,karte=parseEur(v.karte)||0,gz=parseEur(v.gezaehlt);const d=v.datum||today();
-   if(bar<0||karte<0){toast('Beträge dürfen nicht negativ sein.');return false}
-   if(!(bar>0)&&!(karte>0)){toast('Bitte Bar- oder Karteneinnahmen eintragen.');return false}
-   const sm=stornoMap();if(S.kasse.some(k=>k.datum===d&&k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr])){toast('Für diesen Tag sind schon Einnahmen eingetragen.');return false}
-   const belege=[];for(const bf of belegFiles){try{belege.push(await uploadBeleg(bf))}catch(e){toast('Ein Foto konnte nicht gespeichert werden.',4000)}}
-   const soll=barbestand()+bar;const txt='Tageseinnahmen '+fmtDate(d)+(v.notiz.trim()?' – '+v.notiz.trim():'');
-   await mutate('kasse/'+ymOf(d),doc=>{doc.entries=doc.entries||[];doc.abschluesse=doc.abschluesse||[];const ts=new Date().toISOString();
-     if(bar>0)doc.entries.push({id:uid(),ts,nr:nextNr(d,doc.entries),datum:d,art:'einnahme',zahlart:'bar',betrag:bar,kategorie:'Tageseinnahmen bar',text:txt,tagesEinnahme:true,belege});
-     if(karte>0)doc.entries.push({id:uid(),ts,nr:nextNr(d,doc.entries),datum:d,art:'einnahme',zahlart:'karte',betrag:karte,kategorie:'Tageseinnahmen Karte (SumUp)',text:txt,tagesEinnahme:true,belege:bar>0?[]:belege});
-     if(!isNaN(gz)){const df=gz-soll;
-       if(df!==0)doc.entries.push({id:uid(),ts,nr:nextNr(d,doc.entries),datum:d,art:df>0?'einnahme':'ausgabe',zahlart:'bar',betrag:Math.abs(df),kategorie:'Kassendifferenz',text:'Kassendifferenz Kassensturz '+fmtDate(d)});
-       doc.abschluesse.push({id:uid(),datum:d,ts,soll,ist:gz,differenz:df})}
+ async tag(f){const days=(f.dataset.days||'').split(',').filter(Boolean);const neu={};
+   for(const d of days)for(const z of ['bar','karte']){const raw=f.querySelector(`[name=${z}_${d}]`).value.trim();const v=raw?parseEur(raw):0;if(isNaN(v)||v<0){toast('Ungültiger Betrag am '+fmtDate(d)+'.');return false}neu[d+'|'+z]=v}
+   const months=[...new Set(days.map(ymOf))];
+   for(const ym of months)await mutate('kasse/'+ym,doc=>{doc.entries=doc.entries||[];
+     for(const d of days.filter(x=>ymOf(x)===ym))for(const z of ['bar','karte']){const v=neu[d+'|'+z];
+       const ex=doc.entries.filter(e=>e.datum===d&&e.tagesEinnahme&&e.zahlart===z);
+       if(v>0){if(ex.length){ex[0].betrag=v;doc.entries=doc.entries.filter(e=>!ex.slice(1).includes(e))}
+         else doc.entries.push({id:uid(),ts:new Date().toISOString(),nr:nextNr(d,doc.entries),datum:d,art:'einnahme',zahlart:z,betrag:v,kategorie:z==='bar'?'Tageseinnahmen bar':'Tageseinnahmen Karte (SumUp)',text:'Tageseinnahmen '+fmtDate(d),tagesEinnahme:true})}
+       else if(ex.length)doc.entries=doc.entries.filter(e=>!ex.includes(e))}
      return doc});
-   UI.posReset=true;renderBody();window.scrollTo(0,0);toast('Tageseinnahmen '+fmtDate(d)+' gespeichert: '+eur(bar+karte),3500);UI.askBackup=true;renderBody();return false},
+   UI.askBackup=true;renderBody();toast('Einnahmen gespeichert');return false},
+ async buchung(f){const v=Object.fromEntries(new FormData(f));const betrag=parseEur(v.betrag);if(!(betrag>0)){toast('Bitte einen gültigen Betrag eingeben.');return false}
+   if(!v.datum){toast('Bitte ein Datum wählen.');return false}
+   const old=S.kasse.find(k=>k.id===f.dataset.id);if(!old)return;let moved=null;
+   await mutate('kasse/'+ymOf(old.datum),doc=>{const e=(doc.entries||[]).find(x=>x.id===old.id);if(!e)return doc;
+     Object.assign(e,{datum:v.datum,art:v.art,zahlart:v.zahlart,betrag,kategorie:v.kategorie,text:v.text.trim()||e.text});
+     if(ymOf(v.datum)!==ymOf(old.datum)){moved=e;doc.entries=doc.entries.filter(x=>x.id!==old.id)}return doc});
+   if(moved)await mutate('kasse/'+ymOf(v.datum),doc=>{doc.entries=doc.entries||[];doc.entries.push(moved);return doc});
+   toast('Buchung geändert')},
  async setup(f){const v=Object.fromEntries(new FormData(f));
    if(!pinOk4(v.a_pw)){toast('Admin-PIN: genau 4 Ziffern.');return false}
    if(v.a_pw!==v.a_pw2){toast('Die Admin-PINs stimmen nicht überein.');return false}
@@ -1134,6 +1186,10 @@ async function saveFile(filename,data){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return true;
 }
 
+const ctip=document.createElement('div');ctip.id='ctip';ctip.hidden=true;document.body.appendChild(ctip);
+document.addEventListener('pointermove',e=>{const h=e.target.closest&&e.target.closest('.chart .hit');if(!h){ctip.hidden=true;return}
+  ctip.innerHTML=h.dataset.tip;ctip.hidden=false;const w=ctip.offsetWidth;ctip.style.left=Math.min(window.innerWidth-w-8,Math.max(8,e.clientX-w/2))+'px';ctip.style.top=(e.clientY-ctip.offsetHeight-14)+'px'});
+document.addEventListener('pointerdown',e=>{if(!(e.target.closest&&e.target.closest('.chart .hit')))ctip.hidden=true});
 let artikelFotoFile=null;
 async function produktFoto(file){const b=await compressImage(file,1200,.85);const r=await assets.upload(b,{type:'image/jpeg'});return r.id}
 /* ================= Barcode mit Live-Kamera ================= */
@@ -1266,7 +1322,7 @@ function sicherungCard(){
 /* ================= Benutzer & Anmeldung ================= */
 const users=()=>Array.isArray(S.settings.users)?S.settings.users:[];
 const isAdmin=()=>!!(UI.user&&UI.user.role==='admin');
-const ADMIN_ONLY=new Set(['storno','kunde-del','besuch-del','artikel-del','pin-change','lock','user-neu','user-del','user-pw','bio-aus','sicherung-voll']);
+const ADMIN_ONLY=new Set(['buchung-del','storno','kunde-del','besuch-del','artikel-del','pin-change','lock','user-neu','user-del','user-pw','bio-aus','sicherung-voll']);
 async function pwHash(pw,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
   return b64(await crypto.subtle.deriveBits({name:'PBKDF2',salt:unb64(salt),iterations:150000,hash:'SHA-256'},k,256))}
 async function neuerUser(name,role,pw){const salt=b64(crypto.getRandomValues(new Uint8Array(16)));return {id:uid(),name:name.trim(),role,salt,hash:await pwHash(pw,salt)}}
