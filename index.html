@@ -483,7 +483,7 @@ lager:()=>loadingOr(()=>{if(UI.serie)return serieView();
   return `<div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Artikel</span><b>${S.artikel.length}</b></div><div class="card stat"><span class="label">Lagerwert (EK)</span><b>${eur(Math.round(wert))}</b></div><div class="card stat"><span class="label">Unter Mindestbestand</span><b>${lowStock().length}</b></div></div>
   <div class="card" style="padding:6px 10px">${list.length?`<div class="list">${list.map(a=>{const low=num(a.minBestand)>0&&num(a.bestand)<=num(a.minBestand);
    return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="" data-act="artikel-open" data-id="${a.id}">`:`<div class="pthumb ph" data-act="artikel-open" data-id="${a.id}" aria-hidden="true">${esc((a.name||"?").slice(0,1))}</div>`}<div class="grow click" data-act="artikel-open" data-id="${a.id}" style="cursor:pointer"><div class="title">${esc(a.name)}</div><div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div></div>
-   ${artikelPills(a)}${low?'<span class="pill bad">nachbestellen</span>':''}<span class="stock ${low?'minus':''}">${num(a.bestand)}</span>
+   ${artikelPills(a)}${low?'<span class="pill bad">nachbestellen</span>':''}<span class="stock ${low?'minus':''}">${fmtM(num(a.bestand))}</span>
    <div class="stepper"><button data-act="quick" data-id="${a.id}" data-d="-1" aria-label="Einen entnehmen">−</button><button data-act="quick" data-id="${a.id}" data-d="1" aria-label="Einen hinzufügen">+</button></div></div>`}).join('')}</div>`:`<div class="empty">${S.artikel.length?'Keine Treffer.':'Noch keine Artikel. Barcode einer Farbtube scannen oder „+ Artikel“ tippen.'}</div>`}</div>`;
 }),
 /* ---- Kasse ---- */
@@ -534,7 +534,7 @@ function kundeDetail(k){
    ${k.notiz?`<div class="notice info" style="margin-top:8px">${esc(k.notiz)}</div>`:''}
    <div class="small" style="margin-top:8px">${k.fotoEinwilligung?`<span class="pill ok">Foto-Einwilligung seit ${fmtDate(k.einwilligungDatum)}</span>`:'<span class="pill warn">Keine Foto-Einwilligung</span>'}</div></div>
   <div class="card" style="margin-top:16px"><h3>Besuche & Arbeiten</h3>${besuche.length?besuche.map(b=>`<div class="visit"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${fmtDate(b.datum)}${b.zeit?' · '+esc(b.zeit):''}</b><span class="num">${b.betrag?eur(b.betrag):''} <button class="btn sm" data-act="besuch-edit" data-kunde="${k.id}" data-id="${b.id}">Bearbeiten</button></span></div>
-    <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${(b.material||[]).length?`<div class="small">Material: ${b.material.map(m=>esc(m.name)+' × '+m.menge).join(', ')}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
+    <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${(b.material||[]).length?`<div class="small">Material: ${b.material.map(m=>esc(m.name)+' '+(m.ml!=null?fmtM(m.ml)+' '+esc(m.eh||'ml'):fmtM(m.menge)+' '+esc(m.eh||'Stk'))).join(' + ')}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
     ${(b.fotos||[]).length?`<div class="thumbs">${b.fotos.map(id=>`<img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Noch keine Besuche erfasst.</div>'}</div>`;
 }
 
@@ -716,7 +716,7 @@ function besuchForm(kundeId,b={},fromTermin){
    <div class="field"><label for="f-bnotiz">Notiz</label><input id="f-bnotiz" name="notiz" value="${esc(b.notiz||'')}"></div>
    <div class="field"><span class="label">Fotos (max. 4)</span>${fotoOk?(assets?`<div class="thumbs" id="b-thumbs"></div><label class="btn" style="align-self:flex-start">Foto aufnehmen / wählen<input type="file" accept="image/*" id="b-foto" multiple hidden></label>`:'<div class="small muted">Fotos können in dieser Ansicht nicht gespeichert werden.</div>'):'<div class="notice">Keine Foto-Einwilligung in der Kundenkarte. Erst die Einwilligung einholen und dort abhaken.</div>'}</div>
    ${neu?`<div class="field"><span class="label">Verbrauchtes Material – wird beim Speichern vom Lager abgebucht</span><div id="b-verbrauch" class="grid" style="gap:6px"></div>
-     <div class="actions"><select id="b-art" style="width:auto;flex:1" aria-label="Artikel"><option value="">Artikel wählen …</option>${S.artikel.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).map(a=>`<option value="${a.id}">${esc(a.name)} (${num(a.bestand)})</option>`).join('')}</select><button type="button" class="btn sm" data-act="b-art-add">Hinzufügen</button><button type="button" class="btn sm" data-act="b-art-scan">Scannen</button></div></div>
+     <div class="actions"><select id="b-art" style="width:auto;flex:1" aria-label="Artikel"><option value="">Artikel wählen …</option>${S.artikel.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).map(a=>`<option value="${a.id}">${esc(a.name)} (${fmtM(num(a.bestand))})</option>`).join('')}</select><button type="button" class="btn sm" data-act="b-art-add">Hinzufügen</button><button type="button" class="btn sm" data-act="b-art-scan">Scannen</button></div></div>
 `:''}
    <div class="modal-foot">${!neu?`<button type="button" class="btn danger" data-act="besuch-del" data-kunde="${kundeId}" data-id="${b.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary" id="b-save">Speichern</button></div></form>`,
   {wide:true,onMount:m=>{
@@ -729,8 +729,19 @@ function renderThumbs(){const t=$('#b-thumbs');if(!t)return;
   t.innerHTML=pending.keep.map(id=>`<div class="thumb-wrap"><img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Gespeichertes Foto"><button type="button" data-act="thumb-del" data-id="${id}" aria-label="Foto entfernen">×</button></div>`).join('')+
   pending.files.map((f,i)=>`<div class="thumb-wrap"><img class="thumb" src="${URL.createObjectURL(f)}" alt="Neues Foto"><button type="button" data-act="thumb-del-new" data-i="${i}" aria-label="Foto entfernen">×</button></div>`).join('');}
 function sumChips(scope){const f=(scope&&scope.closest&&scope.closest('form'))||(scope&&scope.querySelector&&scope.querySelector('form'))||document;const inp=f.querySelector('[name=betrag]');if(!inp)return;const s=$$('.chip[aria-pressed="true"]',f).reduce((a,c)=>a+Number(c.dataset.preis||0),0);inp.value=s?eurPlain(s):''}
-function vbAdd(id){const v=pending.verbrauch.find(x=>x.id===id);if(v)v.menge=Math.round((num(v.menge)+1)*10)/10;else pending.verbrauch.push({id,menge:1})}
-function renderVerbrauch(){const box=$('#b-verbrauch');if(!box)return;box.innerHTML=pending.verbrauch.map((v,i)=>{const a=S.artikel.find(x=>x.id===v.id);return `<div class="row" style="padding:6px 0"><div class="grow">${esc(a?a.name:'?')}</div><input type="number" min="0.1" step="0.1" value="${v.menge}" data-vi="${i}" style="width:90px" aria-label="Menge"><span class="small muted">${esc(a&&a.einheit||'Stk')}</span><button type="button" class="btn sm danger" data-act="v-del" data-i="${i}" aria-label="Entfernen">×</button></div>`}).join('')}
+const fmtM=n=>(Math.round(n*1000)/1000).toLocaleString('de-DE',{maximumFractionDigits:3});
+const artInhalt=a=>a&&num(a.inhalt)>0?num(a.inhalt):0;
+function vbAdd(id){const a=S.artikel.find(x=>x.id===id);const inh=artInhalt(a);const v=pending.verbrauch.find(x=>x.id===id);
+  if(v){if(inh){v.ml=num(v.ml)+(inh<=100?inh:0);v.menge=v.ml/inh}else v.menge=Math.round((num(v.menge)+1)*100)/100;return}
+  if(inh){const ml=inh<=100?inh:0;pending.verbrauch.push({id,ml,menge:ml/inh})}else pending.verbrauch.push({id,menge:1})}
+function renderVerbrauch(){const box=$('#b-verbrauch');if(!box)return;let tot=0,eh='';
+  box.innerHTML=pending.verbrauch.map((v,i)=>{const a=S.artikel.find(x=>x.id===v.id);const inh=artInhalt(a);const u=inh?(a.inhaltEinheit||'ml'):(a&&a.einheit||'Stk');
+   if(inh){tot+=num(v.ml);eh=eh&&eh!==u?'gemischt':u}
+   const q=[[.25,'¼'],[.5,'½'],[.75,'¾'],[1,'1']].map(([f,l])=>`<button type="button" class="btn sm" data-act="v-q" data-i="${i}" data-f="${f}" aria-label="${l} Packung">${l}</button>`).join('');
+   return `<div class="row" style="padding:6px 0;flex-wrap:wrap"><div class="grow" style="min-width:160px">${esc(a?a.name:'?')}<div class="small muted" id="vh-${i}">${inh?`Packung ${fmtM(inh)} ${esc(u)} · abgebucht ${fmtM(num(v.menge))} Pkg.`:'Anteil der Packung antippen oder eintragen'}</div></div>
+    <div class="actions" style="gap:4px">${q}</div><input type="number" min="0" step="any" value="${inh?fmtNum(v.ml):fmtNum(v.menge)}" data-vi="${i}" style="width:90px${(inh?!num(v.ml):!num(v.menge))?';border-color:var(--bad)':''}" aria-label="Menge"><span class="small muted" style="min-width:2em">${esc(u)}</span><button type="button" class="btn sm danger" data-act="v-del" data-i="${i}" aria-label="Entfernen">×</button></div>`}).join('')
+   +(pending.verbrauch.filter(v=>artInhalt(S.artikel.find(x=>x.id===v.id))).length>1&&eh!=='gemischt'?`<div class="small" id="v-tot" style="text-align:right">Mischung gesamt: <b>${fmtM(tot)} ${esc(eh)}</b></div>`:'')}
+const fmtNum=n=>Math.round(num(n)*1000)/1000;
 
 /* ---- Artikel ---- */
 function artikelForm(a={}){
@@ -739,7 +750,7 @@ function artikelForm(a={}){
    ${fld('name','Bezeichnung (z. B. Koleston 7/1)',a.name)}${fld('marke','Marke / Hersteller',a.marke)}
    <div class="field"><label for="f-ean">EAN / Barcode</label><div class="actions" style="flex-wrap:nowrap"><input id="f-ean" name="ean" value="${esc(a.ean||'')}" inputmode="numeric"><button type="button" class="btn sm" data-act="ean-scan">Scannen</button></div></div>
    <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option ${a.kategorie===k?'selected':''}>${k}</option>`).join('')}</select></div>
-   ${fld('einheit','Einheit',a.einheit||'Stk')}${a.id?'':fld('bestand','Anfangsbestand',a.bestand||0,'number','step="any" min="0"')}${fld('minBestand','Mindestbestand (Warnung)',a.minBestand||0,'number','step="any" min="0"')}
+   ${fld('einheit','Einheit',a.einheit||'Stk')}<div class="field"><label for="f-inhalt">Inhalt pro Packung (optional)</label><div class="actions" style="flex-wrap:nowrap"><input id="f-inhalt" name="inhalt" type="number" min="0" step="any" value="${a.inhalt||''}" placeholder="z. B. 60 oder 1000"><select name="inhaltEinheit" style="width:auto" aria-label="Einheit Inhalt">${['ml','g'].map(u=>`<option ${a.inhaltEinheit===u?'selected':''}>${u}</option>`).join('')}</select></div></div>${a.id?'':fld('bestand','Anfangsbestand',a.bestand||0,'number','step="any" min="0"')}${fld('minBestand','Mindestbestand (Warnung)',a.minBestand||0,'number','step="any" min="0"')}
    ${fld('ekPreis','Einkaufspreis (€)',a.ekPreis?eurPlain(a.ekPreis):'','text','inputmode="decimal"')}${fld('vkPreis','Verkaufspreis (€, bei Verkaufsware)',a.vkPreis?eurPlain(a.vkPreis):'','text','inputmode="decimal"')}${fld('mhd','Haltbar bis (MHD)',a.mhd,'date')}</div>
    <div class="field"><span class="label">Produktfoto</span><div class="thumbs" id="a-thumb">${a.foto?`<img class="thumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="Produktfoto">`:''}</div><label class="btn" style="align-self:flex-start">${a.foto?'Foto ersetzen':'Foto aufnehmen / wählen'}<input type="file" accept="image/*" id="a-foto" hidden></label></div>
    <div class="modal-foot">${a.id?`<button type="button" class="btn danger" data-act="artikel-del" data-id="${a.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
@@ -950,6 +961,7 @@ const ACT={
  'thumb-del-new':el=>{pending.files.splice(Number(el.dataset.i),1);renderThumbs()},
  'b-art-add':()=>{const s=$('#b-art');if(!s.value)return;vbAdd(s.value);s.value='';renderVerbrauch()},
  'b-art-scan':()=>startScan(code=>{const a=S.artikel.find(x=>String(x.ean||'').trim()===code);if(a){vbAdd(a.id);renderVerbrauch();toast(a.name+' hinzugefügt')}else toast('Barcode '+code+' ist noch keinem Artikel zugeordnet.',4000)}),
+ 'v-q':el=>{const v=pending.verbrauch[Number(el.dataset.i)];const f=Number(el.dataset.f);const inh=artInhalt(S.artikel.find(x=>x.id===v.id));v.menge=f;if(inh)v.ml=Math.round(f*inh*10)/10;renderVerbrauch()},
  'v-del':el=>{pending.verbrauch.splice(Number(el.dataset.i),1);renderVerbrauch()},
  /* Lager */
  'scan-lager':()=>startScan(lookupEan),
@@ -1041,7 +1053,7 @@ document.addEventListener('input',e=>{
   else if(t.id==='lager-suche'){UI.lagerSuche=t.value;renderBody()}
   else if(t.id==='pos-kunde'){UI.pos.kundeText=t.value;const k=kundeFromLabel(t.value);UI.pos.kundeId=k?k.id:'';const m=$('#pos-email');if(k&&k.email&&m&&!m.value){m.value=k.email;UI.pos.email=k.email}}
   else if(t.closest&&t.closest('form[data-form=tag]'))tagCheck();
-  else if(t.dataset.vi!=null){pending.verbrauch[Number(t.dataset.vi)].menge=num(t.value)}
+  else if(t.dataset.vi!=null){const v=pending.verbrauch[Number(t.dataset.vi)];const inh=artInhalt(S.artikel.find(x=>x.id===v.id));if(inh){v.ml=num(t.value);v.menge=v.ml/inh}else v.menge=num(t.value);t.style.borderColor=num(t.value)?'':'var(--bad)';const h=$('#vh-'+t.dataset.vi);if(h&&inh)h.textContent=h.textContent.replace(/abgebucht [\d.,]+/,'abgebucht '+fmtM(v.menge));const tt=$('#v-tot b');if(tt){const sum=pending.verbrauch.reduce((a,x)=>a+(artInhalt(S.artikel.find(y=>y.id===x.id))?num(x.ml):0),0);tt.textContent=tt.textContent.replace(/^[\d.,]+/,fmtM(sum))}}
 });
 document.addEventListener('change',e=>{
   const t=e.target;
@@ -1079,11 +1091,12 @@ const FORMS={
    toast(clash?'Gespeichert – Achtung: überschneidet sich mit einem anderen Termin.':ruhe?'Gespeichert – Hinweis: '+WD[parseDate(t.datum).getDay()]+' ist Ruhetag.':'Termin gespeichert',clash||ruhe?5000:2600)},
  async besuch(f){const v=Object.fromEntries(new FormData(f));const kundeId=f.dataset.kunde;const k=kundeById(kundeId);const neu=!f.dataset.id;
    const leist=$$('#b-chips .chip[aria-pressed="true"]',f).map(c=>({name:c.dataset.name,preis:Number(c.dataset.preis)||0}));
+   if(neu){const leer=pending.verbrauch.find(x=>!(num(x.menge)>0));if(leer){const a=S.artikel.find(y=>y.id===leer.id);toast('Bitte die Menge für „'+(a?a.name:'?')+'“ eintragen oder die Zeile entfernen.',4500);return false}}
    const btn=$('#b-save');btn.disabled=true;btn.textContent='Speichert …';
    const fotos=[...pending.keep];
    for(const file of pending.files){try{fotos.push(await uploadFoto(file))}catch(e){toast('Ein Foto konnte nicht gespeichert werden.',4000)}}
    const old=neu?{}:S.besuche.find(x=>x.id===f.dataset.id)||{};
-   const b={id:f.dataset.id||uid(),datum:v.datum,zeit:v.zeit,leistungen:leist.map(l=>l.name),rezeptur:v.rezeptur.trim(),notiz:v.notiz.trim(),fotos,betrag:old.betrag||0,kassenNr:old.kassenNr||'',material:neu?pending.verbrauch.filter(x=>x.menge>0).map(x=>{const a=S.artikel.find(y=>y.id===x.id);return {id:x.id,name:a?a.name:'?',menge:x.menge}}):(old.material||[])};
+   const b={id:f.dataset.id||uid(),datum:v.datum,zeit:v.zeit,leistungen:leist.map(l=>l.name),rezeptur:v.rezeptur.trim(),notiz:v.notiz.trim(),fotos,betrag:old.betrag||0,kassenNr:old.kassenNr||'',material:neu?pending.verbrauch.filter(x=>x.menge>0).map(x=>{const a=S.artikel.find(y=>y.id===x.id);const inh=artInhalt(a);return {id:x.id,name:a?a.name:'?',menge:Math.round(x.menge*1000)/1000,...(inh?{ml:num(x.ml),eh:a.inhaltEinheit||'ml'}:{eh:a&&a.einheit||'Stk'})}}):(old.material||[])};
    if(false){const e=await buchen({datum:v.datum,art:'einnahme',zahlart:v.zahlart||'bar',betrag,kategorie:'Dienstleistung',text:(b.leistungen.join(', ')||'Friseurleistung'),kundeId,kundeName:kundeName(k),positionen:leist.filter(l=>l.preis).map(l=>({text:l.name,betrag:l.preis}))});b.kassenNr=e.nr;b._e=e}
    const e=b._e;delete b._e;
    await mutate('besuche/'+kundeId,d=>{d.list=(d.list||[]).filter(x=>x.id!==b.id);d.list.push(b);return d});
@@ -1095,7 +1108,7 @@ const FORMS={
  async artikel(f){const v=Object.fromEntries(new FormData(f));if(!v.name.trim()){toast('Bitte eine Bezeichnung eingeben.');return false}
    const ean=v.ean.trim();const dup=ean&&S.artikel.find(x=>x.ean===ean&&x.id!==f.dataset.id);if(dup){toast('Dieser Barcode gehört schon zu „'+dup.name+'“.',4000);return false}
    const old=S.artikel.find(x=>x.id===f.dataset.id)||{};const nm=v.name.trim();
-   const data={name:nm,marke:v.marke.trim(),ean,kategorie:v.kategorie,einheit:v.einheit.trim()||'Stk',minBestand:num(v.minBestand),ekPreis:parseEur(v.ekPreis)||0,vkPreis:parseEur(v.vkPreis)||0,mhd:v.mhd||'',suche:nm==='Unbekannter Artikel'?(old.suche||(ean?'offen':'')):''};
+   const data={name:nm,marke:v.marke.trim(),ean,kategorie:v.kategorie,einheit:v.einheit.trim()||'Stk',inhalt:num(v.inhalt)||0,inhaltEinheit:v.inhaltEinheit||'ml',minBestand:num(v.minBestand),ekPreis:parseEur(v.ekPreis)||0,vkPreis:parseEur(v.vkPreis)||0,mhd:v.mhd||'',suche:nm==='Unbekannter Artikel'?(old.suche||(ean?'offen':'')):''};
    if(artikelFotoFile){try{data.foto=await produktFoto(artikelFotoFile);if(old.foto)assets.delete(old.foto).catch(()=>{})}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}}
    if(f.dataset.id){await db.doc('artikel/'+f.dataset.id).update(data)}
    else{const id=uid();await db.doc('artikel/'+id).set({...data,bestand:0});const st=num(v.bestand);if(st)await lagerBewegung(id,st,'zugang','Anfangsbestand')}
