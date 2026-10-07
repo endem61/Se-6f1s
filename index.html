@@ -773,13 +773,16 @@ function lookupEan(code){
 function neuScanForm(code){
   artikelFotoFile=null;const a={};
   openModal('Neuer Barcode',`<form data-form="scanneu" data-ean="${esc(code)}" class="grid" style="gap:12px">
-   <div class="notice info">Barcode <b class="num">${esc(code)}</b> ist neu. Name und Hersteller werden automatisch in einer freien Produktdatenbank gesucht (sobald Internet da ist). Profi-Haarfarben sind dort nicht immer enthalten – dann den Namen einmal selbst eintragen.</div>
+   <div class="notice info" id="scan-such">Barcode <b class="num">${esc(code)}</b> ist neu. Suche im Internet läuft …</div>
    <div class="fields">${fld('name','Bezeichnung (optional)','')}
    <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option>${k}</option>`).join('')}</select></div>
    ${fld('menge','Menge (Eingang)',1,'number','min="0" step="any"')}${fld('mhd','Haltbar bis (optional)','','date')}</div>
    <div class="field"><span class="label">Produktfoto (optional – sonst wird ein Bild aus der Datenbank gesucht)</span><div class="thumbs" id="a-thumb">${a.foto?`<img class="thumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="Produktfoto">`:''}</div><label class="btn" style="align-self:flex-start">${a.foto?'Foto ersetzen':'Foto aufnehmen / wählen'}<input type="file" accept="image/*" id="a-foto" hidden></label></div>
    <div class="modal-foot"><button type="button" class="btn" data-act="scan-full" data-ean="${esc(code)}" style="margin-right:auto">Alle Angaben selbst eingeben</button><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
-}
+  const box=$('#scan-such');if(!navigator.onLine){box.innerHTML=`Barcode <b class="num">${esc(code)}</b> ist neu. Kein Internet – der Name wird später automatisch gesucht, oder jetzt selbst eintragen.`;return}
+  produktSuchen(code).then(p=>{const b=$('#scan-such');if(!b||!b.isConnected)return;const inp=$('#f-name');
+    if(p){const fm=b.closest('form');if(fm&&p.bild)fm.dataset.bild=p.bild;if(inp&&!inp.value.trim())inp.value=p.name+(p.marke&&!p.name.toLowerCase().includes(p.marke.toLowerCase())?' ('+p.marke+')':'');b.className='notice ok';b.innerHTML=`Gefunden: <b>${esc(p.name)}</b>${p.marke?' · '+esc(p.marke):''}${p.info?' · '+esc(p.info):''}. Bitte prüfen und speichern.`}
+    else{b.className='notice';b.innerHTML=`Barcode <b class="num">${esc(code)}</b> ist in den freien Produktdatenbanken nicht eingetragen. Bitte die Bezeichnung einmal selbst eintragen – beim nächsten Scannen wird der Artikel sofort erkannt.`;if(inp)inp.focus()}})}
 function mhdInfo(a){if(!a.mhd)return null;const d=Math.round((parseDate(a.mhd)-parseDate(today()))/864e5);return d<0?{cls:'bad',txt:'abgelaufen '+fmtDate(a.mhd)}:d<=60?{cls:'warn',txt:'MHD '+fmtDate(a.mhd)}:{cls:'',txt:'MHD '+fmtDate(a.mhd)}}
 function artikelPills(a){const m=mhdInfo(a);return (a.suche==='offen'?'<span class="pill acc">wird gesucht</span>':a.suche==='nicht_gefunden'?'<span class="pill warn">Name selbst eintragen</span>':'')+(m&&m.cls?`<span class="pill ${m.cls}">${m.txt}</span>`:'')}
 
@@ -1163,6 +1166,7 @@ const FORMS={
    else toast('Code stimmt nicht.');return false},
  async scanneu(f){const v=Object.fromEntries(new FormData(f));const nm=v.name.trim();const id=uid();const menge=num(v.menge);
    let foto='';if(artikelFotoFile){try{foto=await produktFoto(artikelFotoFile)}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}}
+   else if(f.dataset.bild){try{const r=await fetch(f.dataset.bild);const bl=await r.blob();if(r.ok&&/^image\//.test(bl.type))foto=await produktFoto(bl)}catch(_){}}
    await db.doc('artikel/'+id).set({foto,name:nm||'Unbekannter Artikel',marke:'',ean:f.dataset.ean,kategorie:v.kategorie,einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:nm?'':'offen',erfasst:new Date().toISOString()});
    if(menge>0)await lagerBewegung(id,menge,'zugang','Erfasst per Barcode',{mhd:v.mhd||''});
    toast(nm?'Artikel gespeichert':'Gespeichert – Name wird gesucht …',3500);if(!nm)setTimeout(offeneSuchen,300)},
@@ -1295,7 +1299,7 @@ function serieScanList(){const el=$('#scan-list');if(!scanKeep||!UI.serie){el.hi
 async function serieScan(code){if(!UI.serie)return;if(navigator.vibrate)navigator.vibrate(60);
   let a=S.artikel.find(x=>String(x.ean||'').trim()===code);
   if(!a){if(UI.serie.mode==='verbrauch'){$('#scan-msg').textContent='Barcode '+code+' ist nicht im Lager – bitte zuerst als Wareneingang erfassen.';return}
-    const id=uid();a={foto:'',name:'Neuer Artikel '+code,marke:'',ean:code,kategorie:ART_KAT[0],einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:'offen',erfasst:new Date().toISOString()};
+    const id=uid();a={foto:'',name:'Unbekannter Artikel',marke:'',ean:code,kategorie:ART_KAT[0],einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:'offen',erfasst:new Date().toISOString()};
     await db.doc('artikel/'+id).set(a);a={...a,id};if(!S.artikel.find(x=>x.id===id))S.artikel.push(a);setTimeout(offeneSuchen,300)}
   serieAdd(a.id,1);const it=UI.serie.items.find(x=>x.id===a.id);
   $('#scan-msg').innerHTML=`✓ <b>${esc(a.name)}</b> – jetzt ${it.menge} Stk. Nächstes Produkt …`;serieScanList()}
