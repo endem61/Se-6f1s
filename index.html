@@ -220,10 +220,10 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 <input type="file" id="beleg-input" accept="image/*,application/pdf" multiple hidden>
 <div class="toast" id="toast" hidden></div>
 <div id="scanner" hidden role="dialog" aria-label="Barcode scannen"><div class="box">
- <div style="display:flex;justify-content:space-between;align-items:center"><h2>Barcode scannen</h2><button class="icon-btn" data-scan="cancel" aria-label="Schließen">×</button></div>
- <div id="cam-reader"></div><div id="scan-msg" class="small muted">Barcode in den Rahmen halten …</div>
+ <div style="display:flex;justify-content:space-between;align-items:center"><h2 id="scan-title">Barcode scannen</h2><button class="icon-btn" data-scan="cancel" aria-label="Schließen">×</button></div>
+ <div id="cam-reader"></div><div id="scan-msg" class="small muted">Barcode in den Rahmen halten …</div><div id="scan-list" class="small" hidden></div>
  <div class="fields" style="align-items:end"><div class="field"><label for="scan-manual">Oder Nummer eintippen</label><input id="scan-manual" inputmode="numeric" autocomplete="off"></div><button class="btn" data-scan="manual">Übernehmen</button></div>
- <div class="actions"><button class="btn" data-scan="photo">Foto statt Kamera</button><button class="btn" data-scan="cancel">Abbrechen</button></div></div></div>
+ <div class="actions"><button class="btn" data-scan="photo">Foto statt Kamera</button><button class="btn" data-scan="cancel" id="scan-cancel">Abbrechen</button></div></div></div>
 <div id="print-area"></div>
 <div id="update-bar" hidden style="position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 10px);z-index:50;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;font-weight:600">Neue Version verfügbar <button class="btn sm" onclick="location.reload()">Aktualisieren</button></div>
 
@@ -419,7 +419,7 @@ const SHELL={
    <input type="date" id="t-date" value="${UI.terminDatum}" style="width:auto" aria-label="Datum wählen"><button class="btn primary" data-act="termin-neu">+ Termin</button></div></div><div id="body"></div>`,
  kunden:()=>`<div id="body"></div>`,
  lager:()=>`<div class="view-head"><h1>Lager & Inventur</h1><div class="actions">
-   <button class="btn primary" data-act="scan-lager">Barcode scannen</button><button class="btn" data-act="artikel-neu">+ Artikel</button><button class="btn" data-act="inventur-csv">Inventurliste (CSV)</button></div></div>
+   <button class="btn ok" data-act="serie-start" data-k="zugang">+ Wareneingang scannen</button><button class="btn" data-act="serie-start" data-k="verbrauch">− Verbrauch scannen</button><button class="btn" data-act="scan-lager">Artikel per Barcode</button><button class="btn" data-act="artikel-neu">+ Artikel</button><button class="btn" data-act="inventur-csv">Inventurliste (CSV)</button></div></div>
    <div class="fields" style="margin-bottom:14px"><input type="search" id="lager-suche" placeholder="Suchen: Name, Marke, Farbnummer oder EAN" value="${esc(UI.lagerSuche)}" aria-label="Artikel suchen">
    <select id="lager-kat" aria-label="Kategorie"><option value="">Alle Kategorien</option>${ART_KAT.map(k=>`<option ${UI.lagerKat===k?'selected':''}>${k}</option>`).join('')}</select></div><div id="body"></div>`,
  kasse:()=>`<div class="seg" role="group" aria-label="Bereich" style="margin-bottom:16px;flex-wrap:wrap">${[['tag','Einnahmen'],['aus','Ausgaben'],['buch','Kassenbuch'],['belege','Belege'],['euer','EÜR / Jahr'],['abschl','Kassenstürze'],...(isAdmin()?[['fv','Familienvers.']]:[])].map(([k,l])=>`<button data-act="kasse-tab" data-v="${k}" aria-pressed="${UI.kasseTab===k}">${l}</button>`).join('')}</div><div id="body"></div>`,
@@ -476,7 +476,7 @@ kunden:()=>loadingOr(()=>{
    <div>${sel?kundeDetail(sel):'<div class="card empty">Kunden links auswählen, um Kundenkarte und Besuche zu sehen.</div>'}</div></div>`;
 }),
 /* ---- Lager ---- */
-lager:()=>loadingOr(()=>{
+lager:()=>loadingOr(()=>{if(UI.serie)return serieView();
   const q=UI.lagerSuche.trim().toLowerCase();
   const list=S.artikel.filter(a=>(!UI.lagerKat||a.kategorie===UI.lagerKat)&&(!q||[a.name,a.marke,a.ean].join(' ').toLowerCase().includes(q))).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
   const wert=S.artikel.reduce((s,a)=>s+Math.max(0,num(a.bestand))*(Number(a.ekPreis)||0),0);
@@ -836,7 +836,7 @@ function kasseAus(){
   const sum=list.filter(k=>!k.stornoVon&&!sm[k.nr]&&!isPrivat(k)).reduce((a,k)=>a+k.betrag,0);
   const last=UI.lastBooking&&S.kasse.find(k=>k.nr===UI.lastBooking&&k.art==='ausgabe');
   return `<div class="pos"><div class="card grid" style="gap:14px"><h2>Ausgabe buchen</h2>
-   ${last?`<div class="notice ok">Beleg <b>${esc(last.nr)}</b> über <b>${eur(last.betrag)}</b> gebucht.</div>`:''}
+   ${last?`<div class="notice ok" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span>Beleg <b>${esc(last.nr)}</b> über <b>${eur(last.betrag)}</b> gebucht.</span>${last.kategorie==='Wareneinkauf'?`<button class="btn ok sm" data-act="serie-start" data-k="zugang" data-beleg="${esc(last.nr)}" style="margin-left:auto">Gekaufte Ware ins Lager scannen</button>`:''}</div>`:''}
    <div id="pos-form">${kasseFormHtml('ausgabe',{inline:true,kategorie:'Wareneinkauf',zahlart:'ueberweisung'})}</div></div>
    <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h3 style="margin:0">Ausgaben ${parseDate(m+'-01').toLocaleDateString('de-DE',{month:'long'})}</h3><b class="num">${eur(sum)}</b></div>
     ${list.length?`<div class="list">${list.map(k=>`<div class="row"><div class="grow"><div class="title ${sm[k.nr]||k.stornoVon?'muted':''}">${esc(k.text)}</div><div class="small muted">${fmtDate(k.datum)} · ${esc(k.kategorie)} · ${ZAHLART[k.zahlart]||''}${sm[k.nr]?' · storniert':''}</div></div><span class="num minus">${eur(k.betrag)}</span><button class="btn sm" data-act="buchung-edit" data-id="${k.id}">Bearbeiten</button>${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg</button>`:k.stornoVon?'':`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button>`}</div>`).join('')}</div>`:'<div class="empty" style="padding:14px">In diesem Monat noch keine Ausgaben.</div>'}</div></div>`;
@@ -952,6 +952,12 @@ const ACT={
  'v-del':el=>{pending.verbrauch.splice(Number(el.dataset.i),1);renderVerbrauch()},
  /* Lager */
  'scan-lager':()=>startScan(lookupEan),
+ 'serie-start':el=>serieStart(el.dataset.k,el.dataset.beleg),
+ 'serie-scan':()=>startScan(serieScan,true),
+ 'serie-d':el=>{serieAdd(el.dataset.id,Number(el.dataset.d));renderBody()},
+ 'serie-pick':()=>{const v=$('#serie-art').value;if(!v){toast('Bitte einen Artikel wählen.');return}serieAdd(v,1);renderBody()},
+ 'serie-abbruch':()=>{UI.serie=null;renderBody()},
+ 'serie-buchen':async el=>{el.disabled=true;try{await serieBuchen()}catch(e){el.disabled=false;dbFail(e)}},
  'ean-scan':()=>startScan(code=>{$('#f-ean').value=code;const dup=S.artikel.find(x=>String(x.ean||'')===code);toast(dup?'Achtung: Barcode gehört bereits zu „'+dup.name+'“':'Barcode übernommen: '+code,4000)}),
  'artikel-neu':()=>artikelForm(),
  'scan-full':el=>artikelForm({ean:el.dataset.ean}),
@@ -1047,7 +1053,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='a-foto'&&t.files&&t.files[0]){artikelFotoFile=t.files[0];const box=$('#a-thumb');if(box)box.innerHTML=`<img class="thumb" src="${URL.createObjectURL(artikelFotoFile)}" alt="Neues Produktfoto">`;t.value=''}
   else if(t.id==='k-beleg'){const f0=t.files&&t.files[0];const frm=t.closest('form');if(f0&&frm&&frm.dataset.art==='ausgabe'&&!belegFiles.length)belegLesen(f0,frm);const room=4-belegFiles.length;[...t.files].slice(0,Math.max(0,room)).forEach(f=>belegFiles.push(f));if(t.files.length>room)toast('Maximal 4 Seiten pro Beleg.');t.value='';renderBelegFiles()}
 });
-document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#scanner').hidden){scanCb=null;stopScan()}else if(!$('#modal-root').hidden)closeModal()});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#scanner').hidden){closeScan()}else if(!$('#modal-root').hidden)closeModal()});
 
 /* ---------- Formulare speichern ---------- */
 const FORMS={
@@ -1240,17 +1246,19 @@ document.addEventListener('pointerdown',e=>{if(!(e.target.closest&&e.target.clos
 let artikelFotoFile=null;
 async function produktFoto(file){const b=await compressImage(file,1200,.85);const r=await assets.upload(b,{type:'image/jpeg'});return r.id}
 /* ================= Barcode mit Live-Kamera ================= */
-let scanCb=null,liveScanner=null;
-function startScan(cb){scanCb=cb;const o=$('#scanner');o.hidden=false;$('#scan-manual').value='';$('#scan-msg').textContent='Barcode in den Rahmen halten …';
+let scanCb=null,liveScanner=null,scanKeep=false,scanLast={code:'',t:0};
+function startScan(cb,keep){scanCb=cb;scanKeep=!!keep;scanLast={code:'',t:0};const o=$('#scanner');o.hidden=false;$('#scan-manual').value='';$('#scan-msg').textContent=keep?'Ein Produkt nach dem anderen vor die Kamera halten. Zum Schluss „Fertig“.':'Barcode in den Rahmen halten …';
+  $('#scan-title').textContent=keep?(UI.serie&&UI.serie.mode==='verbrauch'?'Verbrauch scannen':'Wareneingang scannen'):'Barcode scannen';$('#scan-cancel').textContent=keep?'Fertig':'Abbrechen';$('#scan-cancel').className=keep?'btn primary':'btn';serieScanList();
   if(!window.Html5Qrcode){$('#scan-msg').textContent='Kamera-Leser nicht geladen. Nummer eintippen oder Foto verwenden.';return}
   const F=window.Html5QrcodeSupportedFormats;
   liveScanner=new Html5Qrcode('cam-reader',{verbose:false,formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE]});
   liveScanner.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>({width:Math.min(320,w*.85),height:Math.min(170,h*.5)})},
-    txt=>{const code=String(txt).trim();if(!code)return;if(navigator.vibrate)navigator.vibrate(60);finishScan(code)},()=>{})
+    txt=>{const code=String(txt).trim();if(!code)return;if(navigator.vibrate)navigator.vibrate(60);finishScan(code,true)},()=>{})
    .catch(()=>{$('#scan-msg').textContent='Kamera nicht verfügbar. Bitte Kamera-Zugriff erlauben (Einstellungen → Safari/SEEN) – oder Nummer eintippen bzw. Foto verwenden.'});
 }
 async function stopScan(){const s=liveScanner;liveScanner=null;if(s){try{await s.stop()}catch(_){}try{s.clear()}catch(_){}}$('#scanner').hidden=true}
-async function finishScan(code){const cb=scanCb;scanCb=null;await stopScan();if(cb)cb(code)}
+async function finishScan(code,cam){if(scanKeep){const n=Date.now();if(cam&&code===scanLast.code&&n-scanLast.t<2500)return;scanLast={code,t:n};if(scanCb)await scanCb(code);return}const cb=scanCb;scanCb=null;await stopScan();if(cb)cb(code)}
+async function closeScan(){const keep=scanKeep;scanCb=null;scanKeep=false;$('#scan-list').hidden=true;await stopScan();if(keep)renderBody()}
 async function decodeBarcode(file){
   if(!window.Html5Qrcode)return null;const F=window.Html5QrcodeSupportedFormats;
   const cfg={verbose:false,formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE]};
@@ -1259,11 +1267,36 @@ async function decodeBarcode(file){
   return null;
 }
 document.addEventListener('click',e=>{const t=e.target.closest('[data-scan]');if(!t)return;e.preventDefault();const a=t.dataset.scan;
-  if(a==='cancel'){scanCb=null;stopScan()}
-  else if(a==='manual'){const v=$('#scan-manual').value.replace(/\s/g,'');if(v.length<6){toast('Bitte die Nummer unter dem Barcode eingeben.');return}finishScan(v)}
+  if(a==='cancel'){closeScan()}
+  else if(a==='manual'){const v=$('#scan-manual').value.replace(/\s/g,'');if(v.length<6){toast('Bitte die Nummer unter dem Barcode eingeben.');return}finishScan(v);$('#scan-manual').value=''}
   else if(a==='photo'){const i=$('#scan-input');i.value='';i.click()}});
 $('#scan-input').addEventListener('change',async ev=>{const f=ev.target.files&&ev.target.files[0];if(!f)return;$('#scan-msg').textContent='Foto wird gelesen …';
   const code=await decodeBarcode(f);if(code)finishScan(code);else $('#scan-msg').textContent='Kein Barcode erkannt. Näher heran und gut ausleuchten – oder Nummer eintippen.'});
+
+/* ================= Serien-Scan: Wareneingang / Verbrauch ================= */
+function serieStart(mode,beleg){UI.serie={mode,beleg:beleg||'',items:[]};UI.lastBooking=null;go('lager')}
+function serieAdd(id,d=1){const it=UI.serie.items.find(x=>x.id===id);if(it)it.menge=Math.max(0,Math.round((it.menge+d)*1000)/1000);else if(d>0)UI.serie.items.unshift({id,menge:d})}
+function serieScanList(){const el=$('#scan-list');if(!scanKeep||!UI.serie){el.hidden=true;return}const it=UI.serie.items.filter(x=>x.menge>0);el.hidden=!it.length;
+  el.innerHTML=it.slice(0,6).map(x=>{const a=S.artikel.find(y=>y.id===x.id);return `<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)"><span>${esc(a?a.name:'…')}</span><b class="num">${UI.serie.mode==='verbrauch'?'−':'+'}${x.menge}</b></div>`}).join('')+(it.length>6?`<div class="muted">… und ${it.length-6} weitere</div>`:'')}
+async function serieScan(code){if(!UI.serie)return;if(navigator.vibrate)navigator.vibrate(60);
+  let a=S.artikel.find(x=>String(x.ean||'').trim()===code);
+  if(!a){if(UI.serie.mode==='verbrauch'){$('#scan-msg').textContent='Barcode '+code+' ist nicht im Lager – bitte zuerst als Wareneingang erfassen.';return}
+    const id=uid();a={foto:'',name:'Neuer Artikel '+code,marke:'',ean:code,kategorie:ART_KAT[0],einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:'offen',erfasst:new Date().toISOString()};
+    await db.doc('artikel/'+id).set(a);a={...a,id};if(!S.artikel.find(x=>x.id===id))S.artikel.push(a);setTimeout(offeneSuchen,300)}
+  serieAdd(a.id,1);const it=UI.serie.items.find(x=>x.id===a.id);
+  $('#scan-msg').innerHTML=`✓ <b>${esc(a.name)}</b> – jetzt ${it.menge} Stk. Nächstes Produkt …`;serieScanList()}
+function serieView(){const z=UI.serie,ein=z.mode==='zugang';const items=z.items.filter(x=>x.menge>0||true);
+  const opts=[...S.artikel].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  return `<div class="card grid" style="gap:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${ein?'Wareneingang ins Lager':'Verbrauch aus dem Lager'}</h2>${z.beleg?`<span class="pill acc">zu Rechnung ${esc(z.beleg)}</span>`:''}</div>
+   <p class="small muted" style="margin:0">${ein?'Gelieferte Produkte nacheinander scannen – jedes Scannen zählt 1 Stück. Die Mengen lassen sich unten mit − / + korrigieren. Erst mit „Ins Lager buchen“ wird der Bestand erhöht.':'Verbrauchte Produkte (z. B. leere Farbtuben) scannen – jedes Scannen zählt 1 Stück. Mit „Vom Lager abbuchen“ wird der Bestand verringert.'}</p>
+   <div class="actions"><button class="btn primary" data-act="serie-scan">${items.length?'Weiter scannen':'Scannen starten'}</button></div>
+   <div class="fields" style="align-items:end"><div class="field"><label for="serie-art">Artikel ohne Barcode hinzufügen</label><select id="serie-art"><option value="">– Artikel wählen –</option>${opts.map(a=>`<option value="${a.id}">${esc(a.name)}${a.marke?' · '+esc(a.marke):''}</option>`).join('')}</select></div><button class="btn" data-act="serie-pick">Hinzufügen</button></div>
+   ${items.length?`<div class="list">${items.map(x=>{const a=S.artikel.find(y=>y.id===x.id)||{name:'…'};return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="">`:`<div class="pthumb ph" aria-hidden="true">${esc((a.name||'?').slice(0,1))}</div>`}<div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">Bestand jetzt ${num(a.bestand)} → danach <b>${Math.round((num(a.bestand)+(ein?1:-1)*x.menge)*1000)/1000}</b></div></div>
+     <div class="stepper"><button data-act="serie-d" data-id="${x.id}" data-d="-1" aria-label="Eins weniger">−</button><span class="stock" style="min-width:2.4em;text-align:center">${x.menge}</span><button data-act="serie-d" data-id="${x.id}" data-d="1" aria-label="Eins mehr">+</button></div></div>`}).join('')}</div>`:'<div class="empty" style="padding:14px">Noch nichts erfasst.</div>'}
+   <div class="modal-foot"><button class="btn" data-act="serie-abbruch" style="margin-right:auto">Abbrechen</button><button class="btn ${ein?'ok':'primary'}" data-act="serie-buchen" ${items.some(x=>x.menge>0)?'':'disabled'}>${ein?'Ins Lager buchen':'Vom Lager abbuchen'}</button></div></div>`}
+async function serieBuchen(){const z=UI.serie;const ein=z.mode==='zugang';let n=0;
+  for(const x of z.items)if(x.menge>0){await lagerBewegung(x.id,(ein?1:-1)*x.menge,ein?'zugang':'verbrauch',ein?(z.beleg?'Rechnung '+z.beleg:'Wareneingang'):'Verbrauch (Scan)');n+=x.menge}
+  UI.serie=null;renderBody();toast((ein?'Eingebucht: ':'Abgebucht: ')+n+' Stück',3500)}
 
 /* ================= Produktdaten zum Barcode (Open Beauty/Food/Products Facts) ================= */
 async function produktSuchen(ean){
