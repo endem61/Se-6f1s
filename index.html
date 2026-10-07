@@ -534,7 +534,7 @@ function kundeDetail(k){
    ${k.notiz?`<div class="notice info" style="margin-top:8px">${esc(k.notiz)}</div>`:''}
    <div class="small" style="margin-top:8px">${k.fotoEinwilligung?`<span class="pill ok">Foto-Einwilligung seit ${fmtDate(k.einwilligungDatum)}</span>`:'<span class="pill warn">Keine Foto-Einwilligung</span>'}</div></div>
   <div class="card" style="margin-top:16px"><h3>Besuche & Arbeiten</h3>${besuche.length?besuche.map(b=>`<div class="visit"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${fmtDate(b.datum)}${b.zeit?' · '+esc(b.zeit):''}</b><span class="num">${b.betrag?eur(b.betrag):''} <button class="btn sm" data-act="besuch-edit" data-kunde="${k.id}" data-id="${b.id}">Bearbeiten</button></span></div>
-    <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
+    <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${(b.material||[]).length?`<div class="small">Material: ${b.material.map(m=>esc(m.name)+' × '+m.menge).join(', ')}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
     ${(b.fotos||[]).length?`<div class="thumbs">${b.fotos.map(id=>`<img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Noch keine Besuche erfasst.</div>'}</div>`;
 }
 
@@ -715,7 +715,7 @@ function besuchForm(kundeId,b={},fromTermin){
    <div class="field"><label for="f-rezeptur">Farbe / Rezeptur</label><textarea id="f-rezeptur" name="rezeptur" placeholder="z. B. Ansatz 7/1 + 8/0 (1:1), Oxidant 6 %, Einwirkzeit 35 Min">${esc(b.rezeptur||'')}</textarea></div>
    <div class="field"><label for="f-bnotiz">Notiz</label><input id="f-bnotiz" name="notiz" value="${esc(b.notiz||'')}"></div>
    <div class="field"><span class="label">Fotos (max. 4)</span>${fotoOk?(assets?`<div class="thumbs" id="b-thumbs"></div><label class="btn" style="align-self:flex-start">Foto aufnehmen / wählen<input type="file" accept="image/*" id="b-foto" multiple hidden></label>`:'<div class="small muted">Fotos können in dieser Ansicht nicht gespeichert werden.</div>'):'<div class="notice">Keine Foto-Einwilligung in der Kundenkarte. Erst die Einwilligung einholen und dort abhaken.</div>'}</div>
-   ${neu?`<div class="field"><span class="label">Verbrauchtes Material (wird vom Lager abgebucht)</span><div id="b-verbrauch" class="grid" style="gap:6px"></div>
+   ${neu?`<div class="field"><span class="label">Verbrauchtes Material – wird beim Speichern vom Lager abgebucht</span><div id="b-verbrauch" class="grid" style="gap:6px"></div>
      <div class="actions"><select id="b-art" style="width:auto;flex:1" aria-label="Artikel"><option value="">Artikel wählen …</option>${S.artikel.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).map(a=>`<option value="${a.id}">${esc(a.name)} (${num(a.bestand)})</option>`).join('')}</select><button type="button" class="btn sm" data-act="b-art-add">Hinzufügen</button><button type="button" class="btn sm" data-act="b-art-scan">Scannen</button></div></div>
 `:''}
    <div class="modal-foot">${!neu?`<button type="button" class="btn danger" data-act="besuch-del" data-kunde="${kundeId}" data-id="${b.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary" id="b-save">Speichern</button></div></form>`,
@@ -729,6 +729,7 @@ function renderThumbs(){const t=$('#b-thumbs');if(!t)return;
   t.innerHTML=pending.keep.map(id=>`<div class="thumb-wrap"><img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Gespeichertes Foto"><button type="button" data-act="thumb-del" data-id="${id}" aria-label="Foto entfernen">×</button></div>`).join('')+
   pending.files.map((f,i)=>`<div class="thumb-wrap"><img class="thumb" src="${URL.createObjectURL(f)}" alt="Neues Foto"><button type="button" data-act="thumb-del-new" data-i="${i}" aria-label="Foto entfernen">×</button></div>`).join('');}
 function sumChips(scope){const f=(scope&&scope.closest&&scope.closest('form'))||(scope&&scope.querySelector&&scope.querySelector('form'))||document;const inp=f.querySelector('[name=betrag]');if(!inp)return;const s=$$('.chip[aria-pressed="true"]',f).reduce((a,c)=>a+Number(c.dataset.preis||0),0);inp.value=s?eurPlain(s):''}
+function vbAdd(id){const v=pending.verbrauch.find(x=>x.id===id);if(v)v.menge=Math.round((num(v.menge)+1)*10)/10;else pending.verbrauch.push({id,menge:1})}
 function renderVerbrauch(){const box=$('#b-verbrauch');if(!box)return;box.innerHTML=pending.verbrauch.map((v,i)=>{const a=S.artikel.find(x=>x.id===v.id);return `<div class="row" style="padding:6px 0"><div class="grow">${esc(a?a.name:'?')}</div><input type="number" min="0.1" step="0.1" value="${v.menge}" data-vi="${i}" style="width:90px" aria-label="Menge"><span class="small muted">${esc(a&&a.einheit||'Stk')}</span><button type="button" class="btn sm danger" data-act="v-del" data-i="${i}" aria-label="Entfernen">×</button></div>`}).join('')}
 
 /* ---- Artikel ---- */
@@ -947,8 +948,8 @@ const ACT={
    if(assets&&b)for(const f of b.fotos||[]){try{await assets.delete(f)}catch(e){}}})},
  'thumb-del':el=>{pending.keep=pending.keep.filter(x=>x!==el.dataset.id);pending.removed.push(el.dataset.id);renderThumbs()},
  'thumb-del-new':el=>{pending.files.splice(Number(el.dataset.i),1);renderThumbs()},
- 'b-art-add':()=>{const s=$('#b-art');if(!s.value)return;pending.verbrauch.push({id:s.value,menge:1});s.value='';renderVerbrauch()},
- 'b-art-scan':()=>startScan(code=>{const a=S.artikel.find(x=>String(x.ean||'').trim()===code);if(a){pending.verbrauch.push({id:a.id,menge:1});renderVerbrauch();toast(a.name+' hinzugefügt')}else toast('Barcode '+code+' ist noch keinem Artikel zugeordnet.',4000)}),
+ 'b-art-add':()=>{const s=$('#b-art');if(!s.value)return;vbAdd(s.value);s.value='';renderVerbrauch()},
+ 'b-art-scan':()=>startScan(code=>{const a=S.artikel.find(x=>String(x.ean||'').trim()===code);if(a){vbAdd(a.id);renderVerbrauch();toast(a.name+' hinzugefügt')}else toast('Barcode '+code+' ist noch keinem Artikel zugeordnet.',4000)}),
  'v-del':el=>{pending.verbrauch.splice(Number(el.dataset.i),1);renderVerbrauch()},
  /* Lager */
  'scan-lager':()=>startScan(lookupEan),
@@ -1082,7 +1083,7 @@ const FORMS={
    const fotos=[...pending.keep];
    for(const file of pending.files){try{fotos.push(await uploadFoto(file))}catch(e){toast('Ein Foto konnte nicht gespeichert werden.',4000)}}
    const old=neu?{}:S.besuche.find(x=>x.id===f.dataset.id)||{};
-   const b={id:f.dataset.id||uid(),datum:v.datum,zeit:v.zeit,leistungen:leist.map(l=>l.name),rezeptur:v.rezeptur.trim(),notiz:v.notiz.trim(),fotos,betrag:old.betrag||0,kassenNr:old.kassenNr||''};
+   const b={id:f.dataset.id||uid(),datum:v.datum,zeit:v.zeit,leistungen:leist.map(l=>l.name),rezeptur:v.rezeptur.trim(),notiz:v.notiz.trim(),fotos,betrag:old.betrag||0,kassenNr:old.kassenNr||'',material:neu?pending.verbrauch.filter(x=>x.menge>0).map(x=>{const a=S.artikel.find(y=>y.id===x.id);return {id:x.id,name:a?a.name:'?',menge:x.menge}}):(old.material||[])};
    if(false){const e=await buchen({datum:v.datum,art:'einnahme',zahlart:v.zahlart||'bar',betrag,kategorie:'Dienstleistung',text:(b.leistungen.join(', ')||'Friseurleistung'),kundeId,kundeName:kundeName(k),positionen:leist.filter(l=>l.preis).map(l=>({text:l.name,betrag:l.preis}))});b.kassenNr=e.nr;b._e=e}
    const e=b._e;delete b._e;
    await mutate('besuche/'+kundeId,d=>{d.list=(d.list||[]).filter(x=>x.id!==b.id);d.list.push(b);return d});
