@@ -97,7 +97,7 @@ nav.tabs .badge{position:absolute;top:8px;right:calc(50% - 22px);background:var(
 .field{display:flex;flex-direction:column;gap:5px;min-width:0}
 .field label{font-size:.85rem;font-weight:600;color:var(--muted)}
 .fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-input[type=text],input[type=tel],input[type=email],input[type=date],input[type=time],input[type=number],input[type=search],input:not([type]),select,textarea{
+input[type=text],input[type=password],input[type=tel],input[type=email],input[type=date],input[type=time],input[type=number],input[type=search],input:not([type]),select,textarea{
   width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;min-height:44px}
 textarea{min-height:80px;resize:vertical}
 .check{display:flex;gap:10px;align-items:flex-start;font-size:.95rem}
@@ -195,13 +195,14 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 .pthumb{width:52px;height:52px;border-radius:10px;object-fit:cover;border:1px solid var(--line);background:var(--surface2);flex:none;cursor:pointer}
 .pthumb.ph{display:grid;place-items:center;font:600 1.3rem var(--f-display);color:var(--muted)}
 .pthumb.big{width:110px;height:110px}
+.role-user [data-act=storno],.role-user [data-act=kunde-del],.role-user [data-act=besuch-del],.role-user [data-act=artikel-del]{display:none!important}
 .lockbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;font-weight:600;cursor:pointer}
 </style>
 </head><body>
 
 <header class="topbar"><div class="topbar-in">
   <span class="brand" id="brand">SEEN Salon</span>
-  <span style="display:flex;gap:10px;align-items:center"><span class="status-dot" id="conn"><i></i><span>Startet …</span></span><button class="lockbtn" id="lockbtn" data-act="app-lock" hidden>Sperren</button></span>
+  <span style="display:flex;gap:10px;align-items:center"><span class="status-dot" id="conn"><i></i><span>Startet …</span></span><button class="lockbtn" id="lockbtn" data-act="logout" hidden>Abmelden</button></span>
 </div></header>
 <main><div id="modal-root" hidden></div><div id="view"></div></main>
 <nav class="tabs" aria-label="Bereiche"><div class="in" id="nav"></div></nav>
@@ -300,9 +301,9 @@ async function init(){
   db=LocalDB;assets=LocalAssets;downloads=true;
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(_){}
   UI.lastBackup=(await IDB.get('meta','lastBackupTs'))||0;UI.hasBackupPw=!!(await IDB.get('meta','backupPw'));
-  db.doc('settings/main').onSnapshot(s=>{S.settings=s.exists?s.data():{};$('#lockbtn').hidden=!(S.settings.appLock&&S.settings.pinHash);markLoaded('settings')});
+  db.doc('settings/main').onSnapshot(s=>{S.settings=s.exists?s.data():{};markLoaded('settings')});
   COLS.forEach(c=>db.collection(c).onSnapshot(q=>{derive(c,q.docs.map(d=>({id:d.id,data:d.data()})));markLoaded(c)}));
-  if(S.settings.appLock&&S.settings.pinHash){UI.appLocked=true;renderNav();renderShell()}
+  UI.appLocked=true;renderNav();renderShell();
   setTimeout(offeneSuchen,4000);
   if('serviceWorker' in navigator){try{const reg=await navigator.serviceWorker.register('sw.js');
     reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)$('#update-bar').hidden=false})})}catch(e){console.warn(e)}}
@@ -328,6 +329,7 @@ const lowStock=()=>S.artikel.filter(a=>num(a.minBestand)>0&&num(a.bestand)<=num(
 
 /* ---------- Schreiben: Kasse ---------- */
 async function buchen(e){
+  e={...e,erfasstVon:(UI.user&&UI.user.name)||''};
   const ym=ymOf(e.datum);let saved;
   await mutate('kasse/'+ym,d=>{d.entries=d.entries||[];const entry={id:uid(),ts:new Date().toISOString(),...e,nr:nextNr(e.datum,d.entries)};d.entries.push(entry);saved=entry;return d});
   return saved;
@@ -379,7 +381,7 @@ const ICONS={
  mehr:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>'};
 const NAV=[['heute','Heute'],['kasse','Kasse'],['termine','Termine'],['kunden','Kunden'],['lager','Lager'],['mehr','Einstellungen']];
 function renderNav(){
-  const lb=$('#lockbtn');if(lb)lb.hidden=!!(UI.appLocked||!(S.settings.appLock&&S.settings.pinHash));if(UI.appLocked){$('#nav').innerHTML='';return}
+  const lb=$('#lockbtn');if(lb)lb.hidden=!UI.user;if(UI.appLocked){$('#nav').innerHTML='';return}
   const low=lowStock().length;
   $('#nav').innerHTML=NAV.map(([k,l])=>`<button data-act="nav" data-v="${k}" ${UI.view===k?'aria-current="page"':''}>${ICONS[k]}<span>${k==='mehr'?'Mehr':l}</span>${k==='lager'&&low?`<span class="badge">${low}</span>`:''}</button>`).join('');
 }
@@ -392,7 +394,7 @@ function renderShell(){
   if(UI.appLocked){v.innerHTML='<div id="body"></div>';renderBody();return}
   v.innerHTML=(SHELL[UI.view]||(()=>''))();renderBody();
 }
-function renderBody(){const b=$('#body');if(!b)return;if(UI.appLocked){b.innerHTML=lockScreen('app');return}const ae=document.activeElement;const aid=ae&&b.contains(ae)?ae.id:null;let pos=null;try{pos=aid?ae.selectionStart:null}catch(_){}
+function renderBody(){const b=$('#body');if(!b)return;if(UI.appLocked){b.innerHTML=S.ready?loginScreen():'<div class="empty">Wird geladen …</div>';const pw=$('#login-pw');if(pw&&window.innerWidth>700)pw.focus();return}const ae=document.activeElement;const aid=ae&&b.contains(ae)?ae.id:null;let pos=null;try{pos=aid?ae.selectionStart:null}catch(_){}
   const oldPf=$('#pos-form',b);const keep=(!UI.posReset&&oldPf&&oldPf.firstElementChild)||null;
   if(UI.posReset)belegFiles=[];UI.posReset=false;
   b.innerHTML=BODY[UI.view]();if(UI.view==='mehr')loadStorage();
@@ -413,7 +415,7 @@ const SHELL={
    <div class="fields" style="margin-bottom:14px"><input type="search" id="lager-suche" placeholder="Suchen: Name, Marke, Farbnummer oder EAN" value="${esc(UI.lagerSuche)}" aria-label="Artikel suchen">
    <select id="lager-kat" aria-label="Kategorie"><option value="">Alle Kategorien</option>${ART_KAT.map(k=>`<option ${UI.lagerKat===k?'selected':''}>${k}</option>`).join('')}</select></div><div id="body"></div>`,
  kasse:()=>`<div class="seg" role="group" aria-label="Bereich" style="margin-bottom:16px;flex-wrap:wrap">${[['tag','Tageseinnahmen'],['aus','Ausgaben'],['buch','Kassenbuch'],['belege','Belege'],['euer','EÜR / Jahr'],['abschl','Kassenstürze']].map(([k,l])=>`<button data-act="kasse-tab" data-v="${k}" aria-pressed="${UI.kasseTab===k}">${l}</button>`).join('')}</div><div id="body"></div>`,
- mehr:()=>`<div class="view-head"><h1>Einstellungen</h1>${UI.unlocked?'<div class="actions"><button class="btn" data-act="pin-change">PIN ändern</button><button class="btn" data-act="lock">Sperren</button></div>':''}</div><div id="body"></div>`
+ mehr:()=>`<div class="view-head"><h1>${isAdmin()?'Einstellungen':'Mehr'}</h1><div class="actions"><button class="btn" data-act="logout">Abmelden</button></div></div><div id="body"></div>`
 };
 
 const BODY={
@@ -478,7 +480,7 @@ lager:()=>loadingOr(()=>{
 /* ---- Kasse ---- */
 kasse:()=>loadingOr(()=>UI.kasseTab==='euer'?kasseEuer():UI.kasseTab==='abschl'?kasseAbschl():UI.kasseTab==='belege'?kasseBelege():UI.kasseTab==='aus'?faelligCard()+kasseAus():UI.kasseTab==='buch'?faelligCard()+kasseBuch():faelligCard()+kasseTag()),
 /* ---- Einstellungen ---- */
-mehr:()=>loadingOr(()=>{if(!UI.unlocked||UI.showRecovery)return lockScreen();const s=S.settings;const L=leistungen();
+mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px">${sicherungCard()}<div class="card small muted">Einstellungen, Preise und Benutzer kann nur der Inhaber ändern.</div></div>`;const s=S.settings;const L=leistungen();
   return `<div class="grid" style="gap:16px">
   <form class="card" data-form="settings"><h3>Betriebsdaten (erscheinen auf Quittungen)</h3><div class="fields">
    ${fld('firma','Salonname',s.firma)}${fld('inhaber','Inhaberin',s.inhaber)}${fld('adresse','Anschrift (Straße, PLZ Ort)',s.adresse)}
@@ -494,9 +496,7 @@ mehr:()=>loadingOr(()=>{if(!UI.unlocked||UI.showRecovery)return lockScreen();con
    <div id="w-rows" class="grid" style="gap:8px">${(S.settings.wiederkehrend||[]).map(wkRow).join('')||''}</div>
    <div class="modal-foot"><button type="button" class="btn" data-act="w-add">+ Abbuchung</button><button class="btn primary">Speichern</button></div></form>
   ${sicherungCard()}
-  <form class="card grid" data-form="appsperre" style="gap:10px"><h3 style="margin:0">App-Sperre</h3>
-   <label class="check"><input type="checkbox" name="appLock" ${s.appLock?'checked':''}><span>SEEN Salon beim Öffnen und nach 5 Minuten ohne Bedienung mit der PIN sperren. So sehen Kundinnen am iPad keine fremden Kundenkarten oder Fotos.</span></label>
-   <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
+  ${usersCard()}
   <div class="card legal"><h3>Rechtliche Hinweise (Stand 2026)</h3>
    <p><b>Kleinunternehmerregelung (§ 19 UStG):</b> Es wird keine Umsatzsteuer ausgewiesen. Jede Quittung trägt automatisch den Hinweis „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ Grenzen: Umsatz im Vorjahr höchstens 25.000 €, im laufenden Jahr höchstens 100.000 €. Wird im laufenden Jahr 100.000 € überschritten, endet die Regelung sofort. Die Auswertung unter Kasse → EÜR zeigt den Stand.</p>
    <p><b>Kasse:</b> Diese App ist ein digitales Kassenbuch für eine <b>offene Ladenkasse</b> und keine zertifizierte Registrierkasse mit TSE. Führen Sie täglich einen Tagesabschluss mit Zählung durch. Buchungen lassen sich nicht löschen oder ändern, nur stornieren; die Belegnummern laufen pro Jahr fortlaufend. Ob diese Form der Kassenführung für Ihren Betrieb anerkannt ist, klären Sie bitte mit Ihrer Steuerberatung oder dem Finanzamt.</p>
@@ -907,10 +907,14 @@ const ACT={
  'sicherung':()=>{UI.askBackup=false;sicherungErstellen(false).catch(e=>{console.error(e);toast('Sicherung fehlgeschlagen.')})},
  'sicherung-voll':()=>sicherungErstellen(true).catch(e=>{console.error(e);toast('Sicherung fehlgeschlagen.')}),
  'monat-pdf':()=>saveFile('Monatsabschluss_'+UI.kasseMonat+'.pdf',monatsPDF(UI.kasseMonat)),
- 'app-lock':()=>{if(S.settings.appLock&&S.settings.pinHash){UI.appLocked=false;appSperren()}},
+ 'logout':()=>abmelden(),
+ 'login-sel':el=>{UI.loginSel=el.dataset.id;renderBody()},
+ 'user-neu':()=>userForm(null),
+ 'user-pw':el=>userForm(users().find(u=>u.id===el.dataset.id)),
+ 'user-del':el=>{const u=users().find(x=>x.id===el.dataset.id);confirmBox('Benutzer löschen',`Zugang von <b>${esc(u.name)}</b> löschen?`,'Löschen',async()=>{await mutate('settings/main',d=>({...d,users:(d.users||[]).filter(x=>x.id!==u.id)}));toast('Gelöscht')})},
  'pin-forgot':()=>{UI.pinRecover=true;renderBody()},
  'recover-cancel':()=>{UI.pinRecover=false;renderBody()},
- 'recovery-ok':()=>{UI.showRecovery=null;renderShell()},
+ 'recovery-ok':()=>{UI.showRecovery=null;const a=users().find(u=>u.role==='admin');if(a&&!UI.user)anmelden(a);else renderShell()},
  'l-add':()=>{$('#l-rows').insertAdjacentHTML('beforeend',leistungRow({name:'',preis:0,dauer:30}))},
  'l-del':el=>el.closest('.l-row').remove(),
  'w-add':()=>{$('#w-rows').insertAdjacentHTML('beforeend',wkRow({kategorie:'Telefon / Internet',tag:1}))},
@@ -928,7 +932,7 @@ function exportKasse(filter,name){
   S.kasse.filter(filter).forEach(k=>rows.push([k.nr,fmtDate(k.datum),fmtTs(k.ts),k.art==='einnahme'?'Einnahme':'Ausgabe',ZAHLART[k.zahlart],k.kategorie,k.text,k.kundeName||'',eurPlain(sign(k)*k.betrag),k.stornoVon||'',sm[k.nr]||'']));
   saveFile(name+'.csv',toCsv(rows));
 }
-document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(!f)return;e.preventDefault();f(el)});
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(!f)return;e.preventDefault();if(ADMIN_ONLY.has(el.dataset.act)&&!isAdmin()){toast('Das darf nur der Inhaber.');return}f(el)});
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='kunden-suche'){UI.kundenSuche=t.value;renderBody()}
@@ -943,7 +947,8 @@ document.addEventListener('change',e=>{
   else if(t.id==='lager-kat'){UI.lagerKat=t.value;renderBody()}
   else if(t.id==='kasse-monat'){UI.kasseMonat=t.value;renderBody()}
   else if(t.id==='euer-jahr'){UI.euerJahr=t.value;renderBody()}
-  else if(t.id==='restore-input'&&t.files&&t.files.length){const files=[...t.files];const pw=($('#f-rpw')||{}).value||'';t.value='';confirmBox('Sicherung laden',`${files.length} Datei(en) laden? Die Daten auf diesem iPad werden durch den Stand der neuesten Sicherung <b>ersetzt</b>.`,'Laden und ersetzen',()=>sicherungLaden(files,pw))}
+  else if(t.id==='logout-min'&&isAdmin()){mutate('settings/main',d=>({...d,logoutMin:Number(t.value)})).then(()=>toast('Gespeichert'))}
+  else if(t.id==='restore-input'&&t.files&&t.files.length&&(isAdmin()||!users().length)){const files=[...t.files];const pw=($('#f-rpw')||{}).value||'';t.value='';confirmBox('Sicherung laden',`${files.length} Datei(en) laden? Die Daten auf diesem iPad werden durch den Stand der neuesten Sicherung <b>ersetzt</b>.`,'Laden und ersetzen',()=>sicherungLaden(files,pw))}
   else if(t.id==='a-foto'&&t.files&&t.files[0]){artikelFotoFile=t.files[0];const box=$('#a-thumb');if(box)box.innerHTML=`<img class="thumb" src="${URL.createObjectURL(artikelFotoFile)}" alt="Neues Produktfoto">`;t.value=''}
   else if(t.id==='k-beleg'){const f0=t.files&&t.files[0];const frm=t.closest('form');if(f0&&frm&&frm.dataset.art==='ausgabe'&&!belegFiles.length)belegLesen(f0,frm);const room=4-belegFiles.length;[...t.files].slice(0,Math.max(0,room)).forEach(f=>belegFiles.push(f));if(t.files.length>room)toast('Maximal 4 Seiten pro Beleg.');t.value='';renderBelegFiles()}
 });
@@ -1007,12 +1012,35 @@ const FORMS={
        doc.abschluesse.push({id:uid(),datum:d,ts,soll,ist:gz,differenz:df})}
      return doc});
    UI.posReset=true;renderBody();window.scrollTo(0,0);toast('Tageseinnahmen '+fmtDate(d)+' gespeichert: '+eur(bar+karte),3500);UI.askBackup=true;renderBody();return false},
+ async setup(f){const v=Object.fromEntries(new FormData(f));
+   if(!v.a_name.trim()){toast('Bitte Namen des Inhabers eingeben.');return false}
+   if(v.a_pw.length<6){toast('Inhaber-Passwort: mindestens 6 Zeichen.');return false}
+   if(v.a_pw!==v.a_pw2){toast('Die Passwörter stimmen nicht überein.');return false}
+   if(v.u_name.trim()&&v.u_pw.length<4){toast('Benutzer-Passwort: mindestens 4 Zeichen.');return false}
+   const L=[await neuerUser(v.a_name,'admin',v.a_pw)];if(v.u_name.trim())L.push(await neuerUser(v.u_name,'user',v.u_pw));
+   const code=recoveryCode();const rh=await pinHash('R:'+code);
+   await mutate('settings/main',d=>({...d,users:L,recoveryHash:rh}));UI.showRecovery=code;renderBody();return false},
+ async login(f){const pw=f.querySelector('[name=pw]');const u=users().find(x=>x.id===(UI.loginSel||(users().length===1?users()[0].id:null)));if(!u||!pw)return false;
+   if(await pwHash(pw.value,u.salt)===u.hash){anmelden(u)}else{pw.value='';toast('Falsches Passwort.');pw.focus()}return false},
+ async userform(f){const v=Object.fromEntries(new FormData(f));if((v.pw||'').length<4){toast('Mindestens 4 Zeichen.');return false}if(v.pw!==v.pw2){toast('Die Passwörter stimmen nicht überein.');return false}
+   if(f.dataset.id){const u=users().find(x=>x.id===f.dataset.id);if(u.role==='admin'&&v.pw.length<6){toast('Inhaber-Passwort: mindestens 6 Zeichen.');return false}
+     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await pwHash(v.pw,salt);await mutate('settings/main',d=>({...d,users:(d.users||[]).map(x=>x.id===u.id?{...x,salt,hash}:x)}))}
+   else{if(!v.name.trim()){toast('Bitte einen Namen eingeben.');return false}if(v.role==='admin'&&v.pw.length<6){toast('Inhaber-Passwort: mindestens 6 Zeichen.');return false}
+     const nu=await neuerUser(v.name,v.role,v.pw);await mutate('settings/main',d=>({...d,users:[...(d.users||[]),nu]}))}
+   toast('Gespeichert')},
  async appsperre(f){const on=f.querySelector('[name=appLock]').checked;if(on&&!S.settings.pinHash){toast('Zuerst eine PIN festlegen.');return false}
    await mutate('settings/main',d=>({...d,appLock:on}));toast(on?'App-Sperre eingeschaltet':'App-Sperre ausgeschaltet');return false},
  async backuppw(f){const pw=f.querySelector('[name=pw]').value;if(pw&&pw.length<8){toast('Bitte mindestens 8 Zeichen.');return false}
    if(pw){await IDB.put('meta','backupPw',pw);UI.hasBackupPw=true;toast('Passwort gespeichert – Sicherungen werden ab jetzt verschlüsselt.',5000)}else{await IDB.del('meta','backupPw');UI.hasBackupPw=false;toast('Passwort entfernt – Sicherungen sind unverschlüsselt.',5000)}
    f.reset();renderBody();return false},
- async recover(f){const code=String(f.querySelector('[name=code]').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const fmt=code.slice(0,5)+'-'+code.slice(5);
+ async recover(f){const code0=String(f.querySelector('[name=code]').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const fmt0=code0.slice(0,5)+'-'+code0.slice(5);const npw=(f.querySelector('[name=pw]')||{}).value||'';
+   if(users().length){if(npw.length<6){toast('Neues Passwort: mindestens 6 Zeichen.');return false}
+     if(!(S.settings.recoveryHash&&await pinHash('R:'+fmt0)===S.settings.recoveryHash)){toast('Code stimmt nicht.');return false}
+     const a=users().find(u=>u.role==='admin');const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await pwHash(npw,salt);
+     const code=recoveryCode();const rh=await pinHash('R:'+code);
+     await mutate('settings/main',d=>({...d,recoveryHash:rh,users:(d.users||[]).map(x=>x.id===a.id?{...x,salt,hash}:x)}));UI.pinRecover=false;UI.showRecovery=code;renderBody();return false}
+   return false},
+ async recoverAlt(f){const code=String(f.querySelector('[name=code]').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const fmt=code.slice(0,5)+'-'+code.slice(5);
    if(S.settings.recoveryHash&&await pinHash('R:'+fmt)===S.settings.recoveryHash){await mutate('settings/main',d=>({...d,pinHash:'',recoveryHash:'',appLock:false}));UI.appLocked=false;UI.pinRecover=false;UI.unlocked=false;toast('Entsperrt. Bitte unter „Mehr“ eine neue PIN festlegen.',6000);UI.view='mehr';renderNav();renderShell()}
    else toast('Code stimmt nicht.');return false},
  async scanneu(f){const v=Object.fromEntries(new FormData(f));const nm=v.name.trim();const id=uid();const menge=num(v.menge);
@@ -1228,19 +1256,66 @@ function sicherungCard(){
   return `<div class="card grid" style="gap:12px"><h3 style="margin:0">Datensicherung</h3>
    <p class="small muted" style="margin:0">Alle Daten liegen nur auf diesem iPad. Jeden Abend sichern: Die Datei enthält alle Daten und die neuen Fotos seit der letzten Sicherung. Im iPad-Fenster „In Dateien sichern“ → <b>OneDrive → Salon-Sicherung</b> wählen.</p>
    <div class="small">Letzte Sicherung: <b>${lb?fmtTs(lb):'noch nie'}</b>${tage!=null&&tage>=2?' <span class="pill warn">vor '+tage+' Tagen</span>':''}</div>
-   <div class="actions"><button class="btn primary" data-act="sicherung">Sicherung jetzt erstellen</button><button class="btn" data-act="sicherung-voll">Komplett mit allen Fotos</button><button class="btn" data-act="export-kasse-jahr">Kassenbuch ${UI.euerJahr} (CSV)</button></div>
-   <form data-form="backuppw" class="fields" style="align-items:end"><div class="field"><label for="f-bpw">Passwort für Sicherungen (empfohlen)</label><input id="f-bpw" name="pw" type="password" autocomplete="new-password" placeholder="${UI.hasBackupPw?'••••••• (gesetzt – neues eingeben zum Ändern)':'mind. 8 Zeichen'}"></div><button class="btn">Passwort speichern</button></form>
-   <p class="small muted" style="margin:0">Mit Passwort ist die Sicherung verschlüsselt: Ohne das Passwort kann niemand die Datei öffnen – auch Sie nicht. Passwort auf Papier notieren und zu Hause aufbewahren.</p>
-   <div class="field"><span class="label">Sicherung wiederherstellen</span><p class="small muted" style="margin:0">Bei einem neuen iPad: zuerst die letzte <b>komplette</b> Sicherung und alle späteren Tagessicherungen gemeinsam auswählen.</p>
-    <div class="fields" style="align-items:end"><div class="field"><label for="f-rpw">Passwort (falls verschlüsselt)</label><input id="f-rpw" type="password" autocomplete="off"></div><label class="btn">Sicherungsdateien wählen<input type="file" id="restore-input" accept=".json,application/json" multiple hidden></label></div></div></div>`;
+   <div class="actions"><button class="btn primary" data-act="sicherung">Sicherung jetzt erstellen</button>${isAdmin()?'<button class="btn" data-act="sicherung-voll">Komplett mit allen Fotos</button>':''}<button class="btn" data-act="export-kasse-jahr">Kassenbuch ${UI.euerJahr} (CSV)</button></div>
+   ${isAdmin()?'':'<!--'}<form data-form="backuppw" class="fields" style="align-items:end"><div class="field"><label for="f-bpw">Passwort für Sicherungen (empfohlen)</label><input id="f-bpw" name="pw" type="password" autocomplete="new-password" placeholder="${UI.hasBackupPw?'••••••• (gesetzt – neues eingeben zum Ändern)':'mind. 8 Zeichen'}"></div><button class="btn">Passwort speichern</button></form>
+   <p class="small muted" style="margin:0">Mit Passwort ist die Sicherung verschlüsselt: Ohne das Passwort kann niemand die Datei öffnen – auch Sie nicht. Passwort auf Papier notieren und zu Hause aufbewahren.</p>${isAdmin()?'':'-->'}
+   ${isAdmin()?'':'<!--'}<div class="field"><span class="label">Sicherung wiederherstellen</span><p class="small muted" style="margin:0">Bei einem neuen iPad: zuerst die letzte <b>komplette</b> Sicherung und alle späteren Tagessicherungen gemeinsam auswählen.</p>
+    <div class="fields" style="align-items:end"><div class="field"><label for="f-rpw">Passwort (falls verschlüsselt)</label><input id="f-rpw" type="password" autocomplete="off"></div><label class="btn">Sicherungsdateien wählen<input type="file" id="restore-input" accept=".json,application/json" multiple hidden></label></div></div>${isAdmin()?'':'-->'}</div>`;
 }
+
+
+/* ================= Benutzer & Anmeldung ================= */
+const users=()=>Array.isArray(S.settings.users)?S.settings.users:[];
+const isAdmin=()=>!!(UI.user&&UI.user.role==='admin');
+const ADMIN_ONLY=new Set(['storno','kunde-del','besuch-del','artikel-del','pin-change','lock','user-neu','user-del','user-pw','sicherung-voll']);
+async function pwHash(pw,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  return b64(await crypto.subtle.deriveBits({name:'PBKDF2',salt:unb64(salt),iterations:150000,hash:'SHA-256'},k,256))}
+async function neuerUser(name,role,pw){const salt=b64(crypto.getRandomValues(new Uint8Array(16)));return {id:uid(),name:name.trim(),role,salt,hash:await pwHash(pw,salt)}}
+function abmelden(){if(!UI.user&&users().length)return;UI.user=null;UI.loginSel=null;UI.appLocked=true;stopScan();if(!$('#modal-root').hidden)hideModal();document.body.classList.remove('role-user');renderNav();renderShell()}
+function anmelden(u){UI.user=u;UI.appLocked=false;UI.loginSel=null;lastActive=Date.now();document.body.classList.toggle('role-user',u.role!=='admin');
+  const lb=$('#lockbtn');if(lb){lb.hidden=false;lb.textContent=u.name+' · Abmelden'}renderNav();renderShell()}
+function loginScreen(){
+  const L=users();
+  if(UI.showRecovery)return `<div class="card grid" style="gap:14px;max-width:440px;margin:24px auto;text-align:center"><h2>Notfall-Code aufschreiben</h2>
+   <p class="small" style="margin:0">Wenn das Inhaber-Passwort vergessen wird, öffnet nur dieser Code die App wieder. Bitte jetzt auf Papier notieren und sicher aufbewahren. Er wird nur dieses eine Mal angezeigt.</p>
+   <div style="font:700 2rem ui-monospace,Menlo,monospace;letter-spacing:.1em">${esc(UI.showRecovery)}</div><button class="btn primary" data-act="recovery-ok">Notiert – weiter</button></div>`;
+  if(!L.length)return `<form data-form="setup" class="card grid" style="gap:14px;max-width:560px;margin:24px auto"><h2>Willkommen bei SEEN Salon</h2>
+   <p class="small muted" style="margin:0">Einmalig zwei Zugänge anlegen. Der <b>Inhaber</b> darf alles (Preise, Einstellungen, Storno, Löschen, Wiederherstellen). Der <b>Benutzer</b> erledigt die tägliche Arbeit.</p>
+   <h3 style="margin:6px 0 0">Inhaber (volle Rechte)</h3><div class="fields">${fld('a_name','Name','')}${fld('a_pw','Passwort (mind. 6 Zeichen)','','password','autocomplete="new-password"')}${fld('a_pw2','Passwort wiederholen','','password','autocomplete="new-password"')}</div>
+   <h3 style="margin:6px 0 0">Benutzer (optional)</h3><div class="fields">${fld('u_name','Name','')}${fld('u_pw','Passwort (mind. 4 Zeichen)','','password','autocomplete="new-password"')}</div>
+   <button class="btn primary pos-go">Zugänge anlegen</button>
+   <div class="field" style="border-top:1px solid var(--line);padding-top:12px"><span class="label">Neues iPad? Stattdessen Sicherung laden</span><p class="small muted" style="margin:0">Die Zugänge kommen dann aus der Sicherung.</p>
+    <div class="fields" style="align-items:end"><div class="field"><label for="f-rpw">Passwort der Sicherung (falls verschlüsselt)</label><input id="f-rpw" type="password" autocomplete="off"></div><label class="btn">Sicherungsdateien wählen<input type="file" id="restore-input" accept=".json,application/json" multiple hidden></label></div></div></form>`;
+  if(UI.pinRecover)return `<form data-form="recover" class="card grid" style="gap:14px;max-width:420px;margin:24px auto;text-align:center"><h2>Passwort vergessen</h2>
+   <p class="small muted" style="margin:0">Notfall-Code des Inhabers eingeben und ein neues Inhaber-Passwort festlegen.</p>
+   <input name="code" autocomplete="off" autocapitalize="characters" style="text-align:center;font-size:1.3rem" placeholder="XXXXX-XXXXX">
+   <input name="pw" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 6 Zeichen)">
+   <button class="btn primary">Zurücksetzen und anmelden</button><button type="button" class="btn" data-act="recover-cancel">Zurück</button></form>`;
+  const sel=UI.loginSel||(L.length===1?L[0].id:null);const su=L.find(u=>u.id===sel);
+  return `<form data-form="login" class="card grid" style="gap:14px;max-width:440px;margin:24px auto;text-align:center"><h2>Anmelden</h2>
+   <div class="chips" style="justify-content:center">${L.map(u=>`<button type="button" class="chip" style="min-width:140px;min-height:60px;font-size:1.1rem" data-act="login-sel" data-id="${u.id}" aria-pressed="${u.id===sel}">${esc(u.name)}<br><small class="muted">${u.role==='admin'?'Inhaber':'Benutzer'}</small></button>`).join('')}</div>
+   ${su?`<input id="login-pw" name="pw" type="password" autocomplete="current-password" placeholder="Passwort von ${esc(su.name)}" style="text-align:center;font-size:1.2rem"><button class="btn primary pos-go">Anmelden</button>`:'<p class="small muted" style="margin:0">Bitte Ihren Namen antippen.</p>'}
+   <button type="button" class="btn sm" data-act="pin-forgot" style="justify-self:center">Passwort vergessen?</button></form>`;
+}
+function usersCard(){const L=users();
+  return `<div class="card grid" style="gap:10px"><h3 style="margin:0">Benutzer</h3>
+   <div class="list">${L.map(u=>`<div class="row"><div class="grow"><div class="title">${esc(u.name)}</div><div class="small muted">${u.role==='admin'?'Inhaber – volle Rechte':'Benutzer – tägliche Arbeit'}</div></div><button class="btn sm" data-act="user-pw" data-id="${u.id}">Passwort ändern</button>${L.length>1&&!(u.role==='admin'&&L.filter(x=>x.role==='admin').length<2)?`<button class="btn sm danger" data-act="user-del" data-id="${u.id}">Löschen</button>`:''}</div>`).join('')}</div>
+   <div class="actions"><button class="btn" data-act="user-neu">+ Benutzer</button></div>
+   <label class="small" style="display:flex;gap:8px;align-items:center">Automatisch abmelden nach <select id="logout-min" style="width:auto">${[5,15,30,60].map(m=>`<option value="${m}" ${(S.settings.logoutMin||5)===m?'selected':''}>${m} Minuten</option>`).join('')}</select> ohne Bedienung</label>
+   <p class="small muted" style="margin:0">Benutzer dürfen nicht: Einstellungen und Preise ändern, Buchungen stornieren, Kunden, Besuche oder Artikel löschen, Sicherungen laden.</p></div>`}
+function userForm(u){
+  openModal(u?'Passwort ändern – '+u.name:'Neuer Benutzer',`<form data-form="userform" data-id="${u?u.id:''}" class="grid" style="gap:12px">
+   ${u?'':`<div class="fields">${fld('name','Name','')}<div class="field"><label for="f-role">Rolle</label><select id="f-role" name="role"><option value="user">Benutzer</option><option value="admin">Inhaber</option></select></div></div>`}
+   <div class="fields">${fld('pw','Neues Passwort','','password','autocomplete="new-password"')}${fld('pw2','Wiederholen','','password','autocomplete="new-password"')}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`)}
 
 /* ================= App-Sperre mit PIN ================= */
 let lastActive=Date.now();
 ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastActive=Date.now()},true));
-function appSperren(){if(!S.settings.appLock||!S.settings.pinHash||UI.appLocked)return;UI.appLocked=true;UI.pin='';stopScan();if(!$('#modal-root').hidden)hideModal();renderNav();renderShell()}
-setInterval(()=>{if(Date.now()-lastActive>5*60000)appSperren()},20000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')lastActive=Math.min(lastActive,Date.now());else if(Date.now()-lastActive>5*60000)appSperren()});
+function appSperren(){if(!UI.user)return;abmelden()}
+const logoutMs=()=>(Number(S.settings.logoutMin)||5)*60000;
+setInterval(()=>{if(Date.now()-lastActive>logoutMs())appSperren()},20000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')lastActive=Math.min(lastActive,Date.now());else if(Date.now()-lastActive>logoutMs())appSperren()});
 const recoveryCode=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const a=crypto.getRandomValues(new Uint8Array(10));return [...a].map(x=>c[x%c.length]).join('').replace(/(.{5})/,'$1-')};
 
 /* ================= Monatsabschluss als PDF ================= */
