@@ -1,0 +1,1262 @@
+<!doctype html>
+<html lang="de"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SEEN Salon">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#8a2d52">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<title>SEEN Salon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Figtree:wght@400;500;600;700&display=swap">
+<script src="lib/html5-qrcode.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<style>
+html,body{margin:0}:root{padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}[hidden]{display:none!important}
+body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+/* Layout: Tablet-App — feste Kopfzeile, Inhalt in Karten, untere Tab-Leiste. Farbton "Beere" wie ein Haarfarbton. */
+:root{
+  --bg:#f5f1f2; --surface:#ffffff; --surface2:#efe8ea; --fg:#241a1e; --muted:#6e6065; --line:#e1d6da;
+  --accent:#8a2d52; --accent-fg:#ffffff; --accent-soft:#f4e4eb;
+  --ok:#2e7a4d; --ok-soft:#e3f1e8; --warn:#9a6210; --warn-soft:#f8ecd6; --bad:#b1261e; --bad-soft:#f8e2e0;
+  --f-display:"Fraunces", Georgia, "Times New Roman", serif;
+  --f-body:"Figtree", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r:12px; --nav-h:64px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151113; --surface:#1f191c; --surface2:#2a2226; --fg:#f2eaed; --muted:#b2a2a8; --line:#3a2f34;
+  --accent:#e27ba4; --accent-fg:#1c0f15; --accent-soft:#3a2230;
+  --ok:#6cc18c; --ok-soft:#1e3326; --warn:#e2a74c; --warn-soft:#3a2d17; --bad:#f08a82; --bad-soft:#3d1f1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151113; --surface:#1f191c; --surface2:#2a2226; --fg:#f2eaed; --muted:#b2a2a8; --line:#3a2f34;
+  --accent:#e27ba4; --accent-fg:#1c0f15; --accent-soft:#3a2230;
+  --ok:#6cc18c; --ok-soft:#1e3326; --warn:#e2a74c; --warn-soft:#3a2d17; --bad:#f08a82; --bad-soft:#3d1f1d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:1.7rem} h2{font-size:1.3rem} h3{font-size:1.08rem}
+button,input,select,textarea{font:inherit;color:inherit}
+.num,td.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:.86rem}
+.label{font-size:.74rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:space-between}
+.brand{font-family:var(--f-display);font-size:1.25rem;font-weight:600;color:var(--accent)}
+.status-dot{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.status-dot i{width:8px;height:8px;border-radius:50%;background:var(--warn);display:inline-block}
+.status-dot.on i{background:var(--ok)}
+
+main{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:16px calc(var(--nav-h) + 32px + env(safe-area-inset-bottom,0px))}
+.view-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs .in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);height:var(--nav-h)}
+nav.tabs button{background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:.74rem;font-weight:600;cursor:pointer;position:relative}
+nav.tabs button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-current="page"]{color:var(--accent)}
+nav.tabs .badge{position:absolute;top:8px;right:calc(50% - 22px);background:var(--bad);color:#fff;border-radius:9px;font-size:.68rem;min-width:17px;height:17px;padding:0 4px;display:grid;place-items:center}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;min-height:44px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:.9rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.icon-btn{border:0;background:none;font-size:1.6rem;line-height:1;width:44px;height:44px;cursor:pointer;color:var(--muted);border-radius:10px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card h3{margin-bottom:10px}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font-size:1.6rem;font-variant-numeric:tabular-nums;font-weight:700}
+
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);min-width:0}
+.row:last-child{border-bottom:0}
+.row.click{cursor:pointer;border-radius:8px}
+.row.click:hover{background:var(--surface2)}
+.row .grow{flex:1;min-width:0}
+.row .title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.time{font-variant-numeric:tabular-nums;font-weight:700;min-width:52px}
+.pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:600;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.acc{background:var(--accent-soft);color:var(--accent)}
+.empty{padding:28px 12px;text-align:center;color:var(--muted)}
+.notice{border-radius:10px;padding:12px 14px;background:var(--warn-soft);color:var(--fg);font-size:.92rem}
+.notice.info{background:var(--accent-soft)}
+
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:.85rem;font-weight:600;color:var(--muted)}
+.fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+input[type=text],input[type=tel],input[type=email],input[type=date],input[type=time],input[type=number],input[type=search],input:not([type]),select,textarea{
+  width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;min-height:44px}
+textarea{min-height:80px;resize:vertical}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.95rem}
+.check input{width:22px;height:22px;margin-top:1px;accent-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:8px 14px;cursor:pointer;font-weight:500;min-height:40px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:9px 14px;cursor:pointer;font-weight:600;min-height:42px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px}
+.day{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 4px;text-align:center;cursor:pointer;min-width:0}
+.day .wd{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.day .dn{font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.day .cnt{font-size:.72rem;color:var(--accent);min-height:1em}
+.day[aria-current="date"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.day[aria-current="date"] .wd,.day[aria-current="date"] .cnt{color:var(--accent-fg)}
+.day.today .dn{text-decoration:underline;text-underline-offset:3px}
+.appt{display:flex;gap:12px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;border-left:4px solid var(--accent)}
+.appt.erledigt{border-left-color:var(--ok);opacity:.8}
+.appt.abgesagt{border-left-color:var(--line);opacity:.55;text-decoration:line-through}
+
+.split{display:grid;gap:16px}
+@media (min-width:900px){.split{grid-template-columns:minmax(280px,1fr) 2fr}}
+@media (max-width:899px){.split.has-sel .pane-list{display:none}}
+@media (min-width:900px){.back-btn{display:none!important}}
+
+.visit{border-top:1px solid var(--line);padding-block:14px;display:flex;flex-direction:column;gap:6px}
+.visit:first-child{border-top:0}
+.recipe{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88rem;background:var(--surface2);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.thumb{width:92px;height:92px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;background:var(--surface2)}
+.thumb-wrap{position:relative}
+.thumb-wrap button{position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;border:0;background:var(--bad);color:#fff;cursor:pointer;font-weight:700}
+
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.num,th.num{text-align:right;white-space:nowrap}
+tr.storno td{color:var(--muted);text-decoration:line-through}
+.plus{color:var(--ok)} .minus{color:var(--bad)}
+.bar{height:10px;border-radius:6px;background:var(--surface2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar.warn i{background:var(--warn)} .bar.bad i{background:var(--bad)}
+.stock{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px;text-align:right}
+.stepper{display:flex;gap:6px}
+.stepper button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:1.2rem;font-weight:700;cursor:pointer}
+
+/* Formulare als eigene Seite (kein schwebendes Fenster) – scrollt mit einem Finger */
+#modal-root{display:block}
+.scrim{display:none}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;width:100%;max-width:860px;margin:0 auto;display:flex;flex-direction:column}
+.modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 12px 8px 20px;gap:10px}
+.modal-body{padding:4px 20px 20px;display:flex;flex-direction:column;gap:14px}
+/* Kassen-Seite */
+.pos{display:grid;gap:16px}
+@media (min-width:900px){.pos{grid-template-columns:1.7fr 1fr;align-items:start}}
+.pos .chip{min-height:56px;padding:12px 18px;font-size:1.02rem;border-radius:12px}
+.pos #f-betrag{font-size:2rem;font-weight:700;min-height:64px;font-variant-numeric:tabular-nums}
+.pos-go{width:100%;min-height:60px;font-size:1.15rem}
+.notice.ok{background:var(--ok-soft)}
+.big-in{font-size:1.6rem!important;font-weight:700;min-height:60px!important;font-variant-numeric:tabular-nums}
+.pos-display{background:var(--surface2);border-radius:14px;padding:14px 18px;text-align:right}
+#pos-amount{font-size:3rem;font-weight:700;line-height:1.1;letter-spacing:-.02em}
+.pos-quick .chip{flex:1 1 140px;min-height:58px;font-size:1.05rem;font-weight:600;border-radius:12px}
+.pos-quick .chip small{font-weight:500;opacity:.8}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.keypad button{min-height:68px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-size:1.7rem;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
+.keypad button:active{background:var(--accent-soft)}
+.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pos-pay{min-height:84px;font-size:1.5rem;border-radius:14px;background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.pos-pay[data-v="karte"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.bon{border-style:dashed}
+.pin-dots{display:flex;gap:12px;justify-content:center}
+.pin-dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.pin-dots i.on{background:var(--accent);border-color:var(--accent)}
+#print-area{display:none}
+@media print{body>*{display:none!important}#print-area{display:block!important;width:72mm;font:12px/1.35 ui-monospace,Menlo,monospace;color:#000}
+ #print-area .c{text-align:center}#print-area .r{display:flex;justify-content:space-between;gap:8px}#print-area hr{border:0;border-top:1px dashed #000}@page{size:80mm auto;margin:3mm}}
+.modal-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:6px}
+.modal img.full{width:100%;border-radius:10px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:30;font-weight:600;max-width:calc(100% - 32px)}
+.denoms{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.denom{display:flex;align-items:center;gap:8px}
+.denom span{min-width:62px;font-variant-numeric:tabular-nums;font-weight:600}
+.legal p{margin:.35em 0 .9em;max-width:70ch}
+#scan-reader{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+#scanner{position:fixed;inset:0;z-index:40;background:rgba(10,6,8,.92);display:flex;align-items:center;justify-content:center;padding:16px}
+#scanner .box{background:var(--surface);border-radius:16px;width:min(560px,100%);padding:16px;display:grid;gap:12px}
+#cam-reader{width:100%;min-height:240px;border-radius:12px;overflow:hidden;background:#000}
+#cam-reader video{width:100%!important;height:auto!important;border-radius:12px}
+.lockbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;font-weight:600;cursor:pointer}
+</style>
+</head><body>
+
+<header class="topbar"><div class="topbar-in">
+  <span class="brand" id="brand">SEEN Salon</span>
+  <span style="display:flex;gap:10px;align-items:center"><span class="status-dot" id="conn"><i></i><span>Startet …</span></span><button class="lockbtn" id="lockbtn" data-act="app-lock" hidden>Sperren</button></span>
+</div></header>
+<main><div id="modal-root" hidden></div><div id="view"></div></main>
+<nav class="tabs" aria-label="Bereiche"><div class="in" id="nav"></div></nav>
+<div id="scan-reader"></div>
+<input type="file" id="scan-input" accept="image/*" capture="environment" hidden>
+<input type="file" id="beleg-input" accept="image/*,application/pdf" multiple hidden>
+<div class="toast" id="toast" hidden></div>
+<div id="scanner" hidden role="dialog" aria-label="Barcode scannen"><div class="box">
+ <div style="display:flex;justify-content:space-between;align-items:center"><h2>Barcode scannen</h2><button class="icon-btn" data-scan="cancel" aria-label="Schließen">×</button></div>
+ <div id="cam-reader"></div><div id="scan-msg" class="small muted">Barcode in den Rahmen halten …</div>
+ <div class="fields" style="align-items:end"><div class="field"><label for="scan-manual">Oder Nummer eintippen</label><input id="scan-manual" inputmode="numeric" autocomplete="off"></div><button class="btn" data-scan="manual">Übernehmen</button></div>
+ <div class="actions"><button class="btn" data-scan="photo">Foto statt Kamera</button><button class="btn" data-scan="cancel">Abbrechen</button></div></div></div>
+<div id="print-area"></div>
+<div id="update-bar" hidden style="position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 10px);z-index:50;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;font-weight:600">Neue Version verfügbar <button class="btn sm" onclick="location.reload()">Aktualisieren</button></div>
+
+<script>
+/* ---------- Helfer ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const isoDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today=()=>isoDate(new Date());
+const nowTime=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+const parseDate=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,(m||1)-1,d||1)};
+const addDays=(s,n)=>{const d=parseDate(s);d.setDate(d.getDate()+n);return isoDate(d)};
+const fmtDate=s=>s?parseDate(s).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+const fmtDateLong=s=>parseDate(s).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const fmtTs=ts=>{const d=new Date(ts);return d.toLocaleDateString('de-DE')+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+const eur=c=>((c||0)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const eurPlain=c=>((c||0)/100).toFixed(2).replace('.',',');
+const parseEur=s=>{if(s==null)return NaN;s=String(s).trim().replace(/\s|€/g,'');if(!s)return NaN;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const v=Number(s);return isFinite(v)?Math.round(v*100):NaN};
+const num=v=>{const n=Number(String(v??'').replace(',','.'));return isFinite(n)?n:0};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const clone=o=>JSON.parse(JSON.stringify(o??{}));
+const ymOf=d=>String(d).slice(0,7);
+const halfKey=d=>ymOf(d)+'-'+(Number(String(d).slice(8,10))<=15?'a':'b');
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,ms)}
+
+/* ---------- Stammdaten ---------- */
+const DEFAULT_LEISTUNGEN=[
+ {id:'l1',name:'Waschen, Schneiden, Föhnen',preis:0,dauer:45},{id:'l2',name:'Herrenhaarschnitt',preis:0,dauer:30},
+ {id:'l3',name:'Kinderhaarschnitt',preis:0,dauer:20},{id:'l4',name:'Färben (Ansatz)',preis:0,dauer:60},
+ {id:'l5',name:'Färben komplett',preis:0,dauer:90},{id:'l6',name:'Strähnen',preis:0,dauer:120},
+ {id:'l7',name:'Föhnen / Styling',preis:0,dauer:30},{id:'l8',name:'Dauerwelle',preis:0,dauer:120}];
+const EIN_KAT=['Sonstige Einnahme','Privateinlage','Dienstleistung','Warenverkauf'];
+const AUS_KAT=['Wareneinkauf','Verbrauchsmaterial','Miete / Raumkosten','Strom / Wasser','Telefon / Internet','Versicherung','Werbung','Fortbildung','Fahrtkosten','Gebühren / Beiträge','Sonstige Ausgabe','Privatentnahme'];
+const PRIVAT=['Privateinlage','Privatentnahme'];
+const ZAHLART={bar:'Bar',karte:'Karte',ueberweisung:'Bank'};
+const ART_KAT=['Haarfarbe','Pflege / Styling','Verkaufsware','Verbrauchsmaterial','Sonstiges'];
+const DENOMS=[50000,20000,10000,5000,2000,1000,500,200,100,50,20,10,5,2,1];
+const leistungen=()=>Array.isArray(S.settings.leistungen)&&S.settings.leistungen.length?S.settings.leistungen:DEFAULT_LEISTUNGEN;
+const WD=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+const ruhetage=()=>Array.isArray(S.settings.ruhetage)?S.settings.ruhetage:[1];
+async function loadStorage(){const el=$('#storage-info');if(!el)return;if(!assets){el.textContent='In dieser Ansicht nicht verfügbar.';return}
+  try{const {usage:u}=await assets.list();const p=u.maxBytes?Math.min(100,u.bytes/u.maxBytes*100):0;const mb=b=>(b/1048576).toLocaleString('de-DE',{maximumFractionDigits:0})+' MB';
+    el.innerHTML=`<div class="small" style="margin-bottom:4px">${u.files} Fotos · ${mb(u.bytes)} von ${u.maxBytes?mb(u.maxBytes):'?'} belegt${u.maxFiles?' · max. '+u.maxFiles+' Dateien':''}</div><div class="bar ${p>=90?'bad':p>=75?'warn':''}"><i style="width:${p}%"></i></div>${p>=75?'<p class="small minus" style="margin:8px 0 0">Der Speicher wird knapp. Bitte Bescheid geben, dann wird ein Archiv für alte Fotos eingerichtet.</p>':''}`}
+  catch(e){el.textContent='Speicherstand konnte nicht gelesen werden.'}}
+
+/* ---------- Zustand ---------- */
+const S={settings:{},kunden:[],besuche:[],termine:[],artikel:[],bewegungen:[],kasse:[],abschluesse:[],raw:{},ready:false,loaded:new Set()};
+const UI={view:'heute',tagDatum:null,posArt:'einnahme',posReset:true,lastBooking:null,pos:{digits:'',chips:[],mail:false,druck:false,kundeId:'',kundeText:'',email:'',last:null},unlocked:false,pin:'',pinFirst:null,terminDatum:today(),kundenSuche:'',kundeSel:null,lagerSuche:'',lagerKat:'',kasseTab:'tag',kasseMonat:ymOf(today()),euerJahr:String(new Date().getFullYear())};
+let db=null,assets=null,downloads=null;
+
+const COLS=['kunden','besuche','termine','artikel','bewegungen','kasse'];
+function derive(col,docs){
+  S.raw[col]=docs;
+  if(col==='kunden'||col==='artikel'){S[col]=docs.map(d=>({id:d.id,...d.data}));return}
+  if(col==='besuche'){S.besuche=docs.flatMap(d=>(d.data.list||[]).map(v=>({...v,kundeId:d.id})));return}
+  if(col==='termine'){S.termine=docs.flatMap(d=>(d.data.list||[]).map(t=>({...t,_doc:d.id})));return}
+  if(col==='bewegungen'){S.bewegungen=docs.flatMap(d=>(d.data.list||[]));return}
+  if(col==='kasse'){
+    S.kasse=docs.flatMap(d=>(d.data.entries||[])).sort((a,b)=>a.nr<b.nr?-1:a.nr>b.nr?1:0);
+    S.abschluesse=docs.flatMap(d=>(d.data.abschluesse||[])).sort((a,b)=>a.ts<b.ts?1:-1);
+  }
+}
+const queues={};
+function mutate(path,fn){
+  const p=(queues[path]||Promise.resolve()).then(async()=>{
+    const ref=db.doc(path);const snap=await ref.get();
+    const next=fn(snap.exists?clone(snap.data()):{});
+    await ref.set(next);return next;});
+  queues[path]=p.catch(()=>{});return p;
+}
+function dbFail(e){console.error(e);const c=e&&e.code;
+  if(c==='quota_exceeded')toast('Speicher des iPads ist voll – bitte eine komplette Sicherung erstellen und Platz freigeben.',7000);
+  else if(c==='invalid_argument')toast('Keine Schreibrechte in dieser Ansicht.',5000);
+  else toast('Speichern fehlgeschlagen – bitte erneut versuchen.',4000);}
+
+let rq=false;
+function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=false;renderBody();renderNav()})}
+
+async function init(){
+  renderNav();renderShell();
+  try{await IDB.open();await LocalDB.load()}catch(e){console.error(e);setConn(false,'Speicher nicht verfügbar');toast('Der Speicher des iPads ist nicht verfügbar. Privatmodus? Bitte normal öffnen.',8000);return}
+  db=LocalDB;assets=LocalAssets;downloads=true;
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(_){}
+  UI.lastBackup=(await IDB.get('meta','lastBackupTs'))||0;UI.hasBackupPw=!!(await IDB.get('meta','backupPw'));
+  db.doc('settings/main').onSnapshot(s=>{S.settings=s.exists?s.data():{};$('#lockbtn').hidden=!(S.settings.appLock&&S.settings.pinHash);markLoaded('settings')});
+  COLS.forEach(c=>db.collection(c).onSnapshot(q=>{derive(c,q.docs.map(d=>({id:d.id,data:d.data()})));markLoaded(c)}));
+  if(S.settings.appLock&&S.settings.pinHash){UI.appLocked=true;renderNav();renderShell()}
+  setTimeout(offeneSuchen,4000);
+  if('serviceWorker' in navigator){try{const reg=await navigator.serviceWorker.register('sw.js');
+    reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)$('#update-bar').hidden=false})})}catch(e){console.warn(e)}}
+}
+function markLoaded(c){S.loaded.add(c);if(S.loaded.size===COLS.length+1&&!S.ready){S.ready=true;setConn(true,'Auf diesem iPad gespeichert')}scheduleRender()}
+function onSnapErr(e){console.error(e);setConn(false,'Verbindung unterbrochen – Seite neu laden')}
+function setConn(on,txt){const c=$('#conn');c.classList.toggle('on',on);c.querySelector('span').textContent=txt}
+
+/* ---------- Berechnungen ---------- */
+const isPrivat=k=>PRIVAT.includes(k.kategorie);
+const sign=k=>k.art==='einnahme'?1:-1;
+function stornoMap(){const m={};S.kasse.forEach(k=>{if(k.stornoVon)m[k.stornoVon]=k.nr});return m}
+function barbestand(){let s=Number(S.settings.kasseAnfang)||0;S.kasse.forEach(k=>{if(k.zahlart==='bar')s+=sign(k)*k.betrag});return s}
+function nextNr(datum,docEntries){
+  const y=String(datum).slice(0,4);let max=0;
+  [...S.kasse,...(docEntries||[])].forEach(k=>{if(String(k.nr).startsWith(y+'-'))max=Math.max(max,Number(String(k.nr).slice(5))||0)});
+  return y+'-'+String(max+1).padStart(4,'0');
+}
+const kundeName=k=>k?[k.vorname,k.nachname].filter(Boolean).join(' '):'';
+const kundeById=id=>S.kunden.find(k=>k.id===id);
+const byZeit=(a,b)=>(a.zeit||'').localeCompare(b.zeit||'');
+const lowStock=()=>S.artikel.filter(a=>num(a.minBestand)>0&&num(a.bestand)<=num(a.minBestand));
+
+/* ---------- Schreiben: Kasse ---------- */
+async function buchen(e){
+  const ym=ymOf(e.datum);let saved;
+  await mutate('kasse/'+ym,d=>{d.entries=d.entries||[];const entry={id:uid(),ts:new Date().toISOString(),...e,nr:nextNr(e.datum,d.entries)};d.entries.push(entry);saved=entry;return d});
+  return saved;
+}
+async function stornieren(nr){
+  const o=S.kasse.find(k=>k.nr===nr);if(!o)return;
+  if(stornoMap()[nr]||o.stornoVon){toast('Dieser Beleg ist bereits storniert.');return}
+  const d=today();
+  return buchen({datum:d,art:o.art,zahlart:o.zahlart,betrag:-o.betrag,kategorie:o.kategorie,text:'Storno zu Beleg '+o.nr+': '+o.text,kundeId:o.kundeId||'',kundeName:o.kundeName||'',stornoVon:o.nr});
+}
+
+/* ---------- Schreiben: Lager ---------- */
+async function lagerBewegung(artikelId,delta,art,notiz,extra={}){
+  const a=await mutate('artikel/'+artikelId,d=>{d.bestand=Math.round((num(d.bestand)+delta)*1000)/1000;if(d.bestand<=0)d.mhd='';if(extra.mhd&&delta>0&&(!d.mhd||d.mhd<today()||extra.mhd<d.mhd))d.mhd=extra.mhd;return d});
+  delete extra.mhd;
+  const dt=today();
+  await mutate('bewegungen/'+halfKey(dt),d=>{d.list=d.list||[];d.list.push({id:uid(),artikelId,artikelName:a.name||'',art,menge:delta,bestandNach:a.bestand,ts:new Date().toISOString(),notiz:notiz||'',...extra});return d});
+  return a;
+}
+
+/* ---------- Fotos ---------- */
+async function compressImage(file,max=1600,q=.82){
+  const url=URL.createObjectURL(file);
+  try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+    const sc=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*sc);c.height=Math.round(img.naturalHeight*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(r,'image/jpeg',q));
+  }finally{URL.revokeObjectURL(url)}
+}
+async function uploadFoto(file){
+  if(!assets)throw {code:'not_granted'};
+  const blob=await compressImage(file,2400,.88);
+  const r=await assets.upload(blob,{type:'image/jpeg'});return r.id;
+}
+const blobUrl=id=>blobCache.get(id)||'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+$('#beleg-input').addEventListener('change',ev=>belegNachreichenUpload(ev.target.files||[]));
+const csvCell=v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const toCsv=rows=>'﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
+
+/* ---------- Navigation ---------- */
+const ICONS={
+ heute:'<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>',
+ termine:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+ kunden:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.4 3.4 0 0 1 0 6.4M18 14.8c1.9.6 3 2.4 3.5 5.2"/></svg>',
+ lager:'<svg viewBox="0 0 24 24"><path d="M3 5v14M6 5v14M9.5 5v14M12 5v14M15.5 5v14M18 5v14M21 5v14"/></svg>',
+ kasse:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg>',
+ mehr:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>'};
+const NAV=[['heute','Heute'],['kasse','Kasse'],['termine','Termine'],['kunden','Kunden'],['lager','Lager'],['mehr','Einstellungen']];
+function renderNav(){
+  const lb=$('#lockbtn');if(lb)lb.hidden=!!(UI.appLocked||!(S.settings.appLock&&S.settings.pinHash));if(UI.appLocked){$('#nav').innerHTML='';return}
+  const low=lowStock().length;
+  $('#nav').innerHTML=NAV.map(([k,l])=>`<button data-act="nav" data-v="${k}" ${UI.view===k?'aria-current="page"':''}>${ICONS[k]}<span>${k==='mehr'?'Mehr':l}</span>${k==='lager'&&low?`<span class="badge">${low}</span>`:''}</button>`).join('');
+}
+function go(v){if(!$('#modal-root').hidden)hideModal();if(v!=='mehr'){UI.unlocked=false;UI.pin='';UI.pinFirst=null}UI.view=v;renderNav();renderShell();window.scrollTo(0,0)}
+
+/* ---------- Ansichten ---------- */
+function renderShell(){
+  if(!$('#modal-root').hidden)return;
+  const v=$('#view');UI.posReset=true;
+  if(UI.appLocked){v.innerHTML='<div id="body"></div>';renderBody();return}
+  v.innerHTML=(SHELL[UI.view]||(()=>''))();renderBody();
+}
+function renderBody(){const b=$('#body');if(!b)return;if(UI.appLocked){b.innerHTML=lockScreen('app');return}const ae=document.activeElement;const aid=ae&&b.contains(ae)?ae.id:null;let pos=null;try{pos=aid?ae.selectionStart:null}catch(_){}
+  const oldPf=$('#pos-form',b);const keep=(!UI.posReset&&oldPf&&oldPf.firstElementChild)||null;
+  if(UI.posReset)belegFiles=[];UI.posReset=false;
+  b.innerHTML=BODY[UI.view]();if(UI.view==='mehr')loadStorage();
+  if(keep){const npf=$('#pos-form',b);if(npf){npf.innerHTML='';npf.appendChild(keep)}}
+
+  if(aid){const n=document.getElementById(aid);if(n){n.focus();try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(_){}}}}
+function loadingOr(fn){return S.ready?fn():'<div class="empty">Daten werden geladen …</div>'}
+
+const SHELL={
+ heute:()=>`<div class="view-head"><div><div class="label">${esc(fmtDateLong(today()))}</div><h1>Guten Tag</h1></div>
+   <div class="actions"><button class="btn primary" data-act="termin-neu">+ Termin</button><button class="btn" data-act="kasse-einnahme">Tageseinnahmen</button><button class="btn" data-act="kasse-ausgabe">+ Ausgabe</button><button class="btn" data-act="scan-lager">Barcode scannen</button><button class="btn" data-act="kunde-neu">+ Kunde</button></div></div><div id="body"></div>`,
+ termine:()=>`<div class="view-head"><h1>Termine</h1><div class="actions">
+   <button class="btn sm" data-act="t-prev" aria-label="Vorherige Woche">‹ Woche</button><button class="btn sm" data-act="t-heute">Heute</button><button class="btn sm" data-act="t-next" aria-label="Nächste Woche">Woche ›</button>
+   <input type="date" id="t-date" value="${UI.terminDatum}" style="width:auto" aria-label="Datum wählen"><button class="btn primary" data-act="termin-neu">+ Termin</button></div></div><div id="body"></div>`,
+ kunden:()=>`<div id="body"></div>`,
+ lager:()=>`<div class="view-head"><h1>Lager & Inventur</h1><div class="actions">
+   <button class="btn primary" data-act="scan-lager">Barcode scannen</button><button class="btn" data-act="artikel-neu">+ Artikel</button><button class="btn" data-act="inventur-csv">Inventurliste (CSV)</button></div></div>
+   <div class="fields" style="margin-bottom:14px"><input type="search" id="lager-suche" placeholder="Suchen: Name, Marke, Farbnummer oder EAN" value="${esc(UI.lagerSuche)}" aria-label="Artikel suchen">
+   <select id="lager-kat" aria-label="Kategorie"><option value="">Alle Kategorien</option>${ART_KAT.map(k=>`<option ${UI.lagerKat===k?'selected':''}>${k}</option>`).join('')}</select></div><div id="body"></div>`,
+ kasse:()=>`<div class="seg" role="group" aria-label="Bereich" style="margin-bottom:16px;flex-wrap:wrap">${[['tag','Tageseinnahmen'],['aus','Ausgaben'],['buch','Kassenbuch'],['belege','Belege'],['euer','EÜR / Jahr'],['abschl','Kassenstürze']].map(([k,l])=>`<button data-act="kasse-tab" data-v="${k}" aria-pressed="${UI.kasseTab===k}">${l}</button>`).join('')}</div><div id="body"></div>`,
+ mehr:()=>`<div class="view-head"><h1>Einstellungen</h1>${UI.unlocked?'<div class="actions"><button class="btn" data-act="pin-change">PIN ändern</button><button class="btn" data-act="lock">Sperren</button></div>':''}</div><div id="body"></div>`
+};
+
+const BODY={
+/* ---- Heute ---- */
+heute:()=>loadingOr(()=>{
+  const t=today();
+  const termine=S.termine.filter(x=>x.datum===t&&x.status!=='abgesagt').sort(byZeit);
+  const heuteK=S.kasse.filter(k=>k.datum===t&&!isPrivat(k));
+  const ein=heuteK.filter(k=>k.art==='einnahme').reduce((a,k)=>a+k.betrag,0);
+  const aus=heuteK.filter(k=>k.art==='ausgabe').reduce((a,k)=>a+k.betrag,0);
+  const low=lowStock();const abgeschl=S.abschluesse.some(a=>a.datum===t);
+  const setup=!S.settings.firma||!S.settings.adresse;
+  const sichAlt=(S.kasse.length||S.kunden.length)&&(!UI.lastBackup||Date.now()-UI.lastBackup>2*864e5);
+  const mhdList=S.artikel.filter(a=>{const m=mhdInfo(a);return m&&m.cls&&num(a.bestand)>0}).sort((a,b)=>a.mhd.localeCompare(b.mhd));
+  return `${sichAlt?`<div class="notice" style="margin-bottom:16px">Die letzte Datensicherung ist ${UI.lastBackup?'älter als 2 Tage':'noch nie erstellt worden'}. <button class="btn sm" data-act="sicherung">Jetzt sichern</button></div>`:''}${setup?`<div class="notice info" style="margin-bottom:16px">Bitte zuerst unter <b>Mehr → Einstellungen</b> Salonname, Adresse, Steuernummer und Leistungspreise eintragen. Diese Angaben stehen auf jeder Quittung. <button class="btn sm" data-act="nav" data-v="mehr">Jetzt eintragen</button></div>`:''}
+  <div class="grid g3" style="margin-bottom:16px">
+   <div class="card stat"><span class="label">Einnahmen heute</span><b>${eur(ein)}</b><span class="small muted">${heuteK.filter(k=>k.art==='einnahme').length} Buchungen</span></div>
+   <div class="card stat"><span class="label">Ausgaben heute</span><b>${eur(aus)}</b></div>
+   <div class="card stat"><span class="label">Barbestand Kasse</span><b>${eur(barbestand())}</b><span class="small">${abgeschl?'<span class="pill ok">Tag abgeschlossen</span>':'<span class="pill warn">Tagesabschluss offen</span>'}</span></div>
+  </div>
+  ${faelligCard()}
+  <div class="grid g2">
+   <div class="card"><h3>Termine heute</h3>${termine.length?`<div class="list">${termine.map(apptRow).join('')}</div>`:'<div class="empty">Heute keine Termine.<br><button class="btn sm" data-act="termin-neu" style="margin-top:8px">+ Termin anlegen</button></div>'}</div>
+   <div class="card"><h3>Nachbestellen</h3>${low.length?`<div class="list">${low.map(a=>`<div class="row click" data-act="artikel-open" data-id="${a.id}"><div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">${esc(a.marke||'')} · Mindestbestand ${num(a.minBestand)}</div></div><span class="pill bad">${num(a.bestand)} ${esc(a.einheit||'Stk')}</span></div>`).join('')}</div>`:'<div class="empty">Alle Artikel ausreichend vorrätig.</div>'}</div>
+   ${mhdList.length?`<div class="card"><h3>Haltbarkeit prüfen</h3><div class="list">${mhdList.map(a=>{const m=mhdInfo(a);return `<div class="row click" data-act="artikel-open" data-id="${a.id}"><div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">${num(a.bestand)} ${esc(a.einheit||'Stk')} auf Lager</div></div><span class="pill ${m.cls}">${m.txt}</span></div>`}).join('')}</div></div>`:''}
+  </div>`;
+}),
+/* ---- Termine ---- */
+termine:()=>loadingOr(()=>{
+  const sel=UI.terminDatum;const d=parseDate(sel);const mo=addDays(sel,-((d.getDay()+6)%7));const t=today();
+  const days=[...Array(7)].map((_,i)=>addDays(mo,i));
+  const week=`<div class="week">${days.map(ds=>{const c=S.termine.filter(x=>x.datum===ds&&x.status!=='abgesagt').length;const dd=parseDate(ds);
+    return `<button class="day ${ds===t?'today':''}" data-act="t-day" data-v="${ds}" ${ds===sel?'aria-current="date"':''}><div class="wd">${dd.toLocaleDateString('de-DE',{weekday:'short'})}</div><div class="dn">${dd.getDate()}</div><div class="cnt">${c?c+' T.':ruhetage().includes(dd.getDay())?'Ruhetag':''}</div></button>`}).join('')}</div>`;
+  const list=S.termine.filter(x=>x.datum===sel).sort(byZeit);
+  return week+`<h2 style="margin-bottom:10px">${esc(fmtDateLong(sel))}</h2>`+(list.length?`<div class="grid" style="gap:8px">${list.map(x=>{const k=kundeById(x.kundeId);
+    return `<div class="appt ${x.status||''}" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><div class="time">${esc(x.zeit)}</div><div class="grow" style="min-width:0"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${esc(x.leistung||'')} · ${num(x.dauer)||30} Min${x.notiz?' · '+esc(x.notiz):''}</div></div>${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':x.status==='abgesagt'?'<span class="pill">abgesagt</span>':''}</div>`}).join('')}</div>`:`<div class="card empty">Keine Termine an diesem Tag.<br><button class="btn sm" data-act="termin-neu" style="margin-top:8px">+ Termin anlegen</button></div>`);
+}),
+/* ---- Kunden ---- */
+kunden:()=>loadingOr(()=>{
+  const q=UI.kundenSuche.trim().toLowerCase();
+  const letzte={};S.besuche.forEach(b=>{if(!letzte[b.kundeId]||b.datum>letzte[b.kundeId])letzte[b.kundeId]=b.datum});
+  const list=S.kunden.filter(k=>!q||[k.vorname,k.nachname,k.telefon,k.email].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de')||(a.vorname||'').localeCompare(b.vorname||'','de'));
+  const sel=UI.kundeSel&&kundeById(UI.kundeSel);
+  return `<div class="split ${sel?'has-sel':''}">
+   <div class="pane-list"><div class="view-head"><h1>Kunden</h1><button class="btn primary" data-act="kunde-neu">+ Kunde</button></div>
+    <input type="search" id="kunden-suche" placeholder="Name oder Telefon suchen" value="${esc(UI.kundenSuche)}" aria-label="Kunden suchen" style="margin-bottom:10px">
+    <div class="card" style="padding:6px 10px">${list.length?`<div class="list">${list.map(k=>`<div class="row click" data-act="kunde-sel" data-id="${k.id}" ${sel&&sel.id===k.id?'style="background:var(--accent-soft)"':''}><div class="grow"><div class="title">${esc(k.nachname||'')}${k.nachname&&k.vorname?', ':''}${esc(k.vorname||'')}</div><div class="small muted">${esc(k.telefon||'')}</div></div><span class="small muted">${letzte[k.id]?fmtDate(letzte[k.id]):'neu'}</span></div>`).join('')}</div>`:`<div class="empty">${S.kunden.length?'Keine Treffer.':'Noch keine Kundinnen und Kunden angelegt.'}</div>`}</div></div>
+   <div>${sel?kundeDetail(sel):'<div class="card empty">Kunden links auswählen, um Kundenkarte und Besuche zu sehen.</div>'}</div></div>`;
+}),
+/* ---- Lager ---- */
+lager:()=>loadingOr(()=>{
+  const q=UI.lagerSuche.trim().toLowerCase();
+  const list=S.artikel.filter(a=>(!UI.lagerKat||a.kategorie===UI.lagerKat)&&(!q||[a.name,a.marke,a.ean].join(' ').toLowerCase().includes(q))).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  const wert=S.artikel.reduce((s,a)=>s+Math.max(0,num(a.bestand))*(Number(a.ekPreis)||0),0);
+  return `<div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Artikel</span><b>${S.artikel.length}</b></div><div class="card stat"><span class="label">Lagerwert (EK)</span><b>${eur(Math.round(wert))}</b></div><div class="card stat"><span class="label">Unter Mindestbestand</span><b>${lowStock().length}</b></div></div>
+  <div class="card" style="padding:6px 10px">${list.length?`<div class="list">${list.map(a=>{const low=num(a.minBestand)>0&&num(a.bestand)<=num(a.minBestand);
+   return `<div class="row"><div class="grow click" data-act="artikel-open" data-id="${a.id}" style="cursor:pointer"><div class="title">${esc(a.name)}</div><div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div></div>
+   ${artikelPills(a)}${low?'<span class="pill bad">nachbestellen</span>':''}<span class="stock ${low?'minus':''}">${num(a.bestand)}</span>
+   <div class="stepper"><button data-act="quick" data-id="${a.id}" data-d="-1" aria-label="Einen entnehmen">−</button><button data-act="quick" data-id="${a.id}" data-d="1" aria-label="Einen hinzufügen">+</button></div></div>`}).join('')}</div>`:`<div class="empty">${S.artikel.length?'Keine Treffer.':'Noch keine Artikel. Barcode einer Farbtube scannen oder „+ Artikel“ tippen.'}</div>`}</div>`;
+}),
+/* ---- Kasse ---- */
+kasse:()=>loadingOr(()=>UI.kasseTab==='euer'?kasseEuer():UI.kasseTab==='abschl'?kasseAbschl():UI.kasseTab==='belege'?kasseBelege():UI.kasseTab==='aus'?faelligCard()+kasseAus():UI.kasseTab==='buch'?faelligCard()+kasseBuch():faelligCard()+kasseTag()),
+/* ---- Einstellungen ---- */
+mehr:()=>loadingOr(()=>{if(!UI.unlocked||UI.showRecovery)return lockScreen();const s=S.settings;const L=leistungen();
+  return `<div class="grid" style="gap:16px">
+  <form class="card" data-form="settings"><h3>Betriebsdaten (erscheinen auf Quittungen)</h3><div class="fields">
+   ${fld('firma','Salonname',s.firma)}${fld('inhaber','Inhaberin',s.inhaber)}${fld('adresse','Anschrift (Straße, PLZ Ort)',s.adresse)}
+   ${fld('steuernummer','Steuernummer',s.steuernummer)}${fld('telefon','Telefon',s.telefon,'tel')}${fld('email','E-Mail',s.email,'email')}</div>
+   <h3 style="margin-top:18px">Kasse</h3><div class="fields">${fld('kasseAnfang','Anfangsbestand Bargeld (€)',s.kasseAnfang!=null?eurPlain(s.kasseAnfang):'','text','inputmode="decimal"')}${fld('kasseAnfangDatum','Stichtag Anfangsbestand',s.kasseAnfangDatum||today(),'date')}</div>
+   <h3 style="margin-top:18px">Ruhetage (Salon geschlossen)</h3><div class="chips">${[1,2,3,4,5,6,0].map(i=>`<label class="chip" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="ruhetag" value="${i}" ${ruhetage().includes(i)?'checked':''} style="accent-color:var(--accent)">${WD[i]}</label>`).join('')}</div>
+   <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
+  <div class="card"><h3>Speicherplatz für Fotos</h3><div id="storage-info" class="small muted">Wird gelesen …</div></div>
+  <form class="card" data-form="leistungen"><h3>Leistungen & Preise</h3><p class="small muted" style="margin:0 0 10px">Diese Liste erscheint beim Kassieren und bei Terminen. Preise in Euro, Dauer in Minuten.</p>
+   <div id="l-rows" class="grid" style="gap:8px">${L.map(leistungRow).join('')}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="l-add">+ Leistung</button><button class="btn primary">Speichern</button></div></form>
+  <form class="card" data-form="wiederkehrend"><h3>Wiederkehrende Abbuchungen</h3><p class="small muted" style="margin:0 0 10px">Z. B. Telefon, Miete, Versicherung. Ab dem eingetragenen Tag erscheint jeden Monat unter „Heute“ und „Kasse“ ein Hinweis zum Buchen. Spalten: Bezeichnung, Betrag, Kategorie, Tag im Monat.</p>
+   <div id="w-rows" class="grid" style="gap:8px">${(S.settings.wiederkehrend||[]).map(wkRow).join('')||''}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="w-add">+ Abbuchung</button><button class="btn primary">Speichern</button></div></form>
+  ${sicherungCard()}
+  <form class="card grid" data-form="appsperre" style="gap:10px"><h3 style="margin:0">App-Sperre</h3>
+   <label class="check"><input type="checkbox" name="appLock" ${s.appLock?'checked':''}><span>SEEN Salon beim Öffnen und nach 5 Minuten ohne Bedienung mit der PIN sperren. So sehen Kundinnen am iPad keine fremden Kundenkarten oder Fotos.</span></label>
+   <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
+  <div class="card legal"><h3>Rechtliche Hinweise (Stand 2026)</h3>
+   <p><b>Kleinunternehmerregelung (§ 19 UStG):</b> Es wird keine Umsatzsteuer ausgewiesen. Jede Quittung trägt automatisch den Hinweis „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ Grenzen: Umsatz im Vorjahr höchstens 25.000 €, im laufenden Jahr höchstens 100.000 €. Wird im laufenden Jahr 100.000 € überschritten, endet die Regelung sofort. Die Auswertung unter Kasse → EÜR zeigt den Stand.</p>
+   <p><b>Kasse:</b> Diese App ist ein digitales Kassenbuch für eine <b>offene Ladenkasse</b> und keine zertifizierte Registrierkasse mit TSE. Führen Sie täglich einen Tagesabschluss mit Zählung durch. Buchungen lassen sich nicht löschen oder ändern, nur stornieren; die Belegnummern laufen pro Jahr fortlaufend. Ob diese Form der Kassenführung für Ihren Betrieb anerkannt ist, klären Sie bitte mit Ihrer Steuerberatung oder dem Finanzamt.</p>
+   <p><b>Quittungen:</b> Bis 250 € genügt eine Kleinbetragsrechnung. Darüber sind Name und Anschrift der Kundin nötig – bitte in der Kundenkarte hinterlegen.</p>
+   <p><b>Aufbewahrung:</b> Kassenbuch, Rechnungen und Belege 8 bzw. 10 Jahre aufbewahren. Täglich die Datensicherung erstellen und in OneDrive ablegen.</p>
+   <p><b>Datenschutz (DSGVO):</b> Fotos von Kundinnen nur mit Einwilligung speichern (Häkchen in der Kundenkarte). Auf Wunsch lässt sich eine Kundenkarte samt Fotos löschen. Alle Daten liegen ausschließlich auf diesem iPad und in Ihren eigenen Sicherungsdateien – nicht im Internet.</p>
+  </div></div>`;})
+};
+
+function fld(name,label,val,type='text',extra=''){return `<div class="field"><label for="f-${name}">${label}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(val??'')}" ${extra}></div>`}
+function leistungRow(l){return `<div class="fields l-row" style="grid-template-columns:2fr 1fr 1fr auto;align-items:end"><input name="l-name" value="${esc(l.name)}" aria-label="Leistung" placeholder="Leistung"><input name="l-preis" value="${l.preis?eurPlain(l.preis):''}" inputmode="decimal" aria-label="Preis in Euro" placeholder="Preis €"><input name="l-dauer" type="number" min="5" step="5" value="${num(l.dauer)||30}" aria-label="Dauer in Minuten"><button type="button" class="btn sm danger" data-act="l-del" aria-label="Leistung entfernen">×</button></div>`}
+
+function apptRow(x){const k=kundeById(x.kundeId);return `<div class="row click" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><span class="time">${esc(x.zeit)}</span><div class="grow"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${esc(x.leistung||'')}</div></div>${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':`<button class="btn sm" data-act="besuch-aus-termin" data-id="${x.id}" data-doc="${x._doc}">Besuch erfassen</button>`}</div>`}
+
+function kundeDetail(k){
+  const besuche=S.besuche.filter(b=>b.kundeId===k.id).sort((a,b)=>b.datum.localeCompare(a.datum));
+  const naechster=S.termine.filter(t=>t.kundeId===k.id&&t.datum>=today()&&t.status!=='abgesagt').sort((a,b)=>(a.datum+a.zeit).localeCompare(b.datum+b.zeit))[0];
+  const umsatz=S.kasse.filter(e=>e.kundeId===k.id&&e.art==='einnahme').reduce((s,e)=>s+e.betrag,0);
+  return `<button class="btn sm back-btn" data-act="kunde-back" style="margin-bottom:10px">‹ Alle Kunden</button>
+  <div class="card"><div class="view-head" style="margin-bottom:8px"><div><h2>${esc(kundeName(k))}</h2><div class="small muted">${esc([k.telefon,k.email].filter(Boolean).join(' · '))}</div></div>
+   <div class="actions"><button class="btn primary" data-act="besuch-neu" data-id="${k.id}">+ Besuch</button><button class="btn" data-act="termin-neu" data-kunde="${k.id}">+ Termin</button><button class="btn" data-act="kunde-edit" data-id="${k.id}">Bearbeiten</button></div></div>
+   <div class="grid g3" style="gap:10px;margin-bottom:6px">
+    <div><div class="label">Besuche</div><b class="num">${besuche.length}</b></div><div><div class="label">Umsatz gesamt</div><b class="num">${eur(umsatz)}</b></div>
+    <div><div class="label">Nächster Termin</div><b>${naechster?fmtDate(naechster.datum)+' '+esc(naechster.zeit):'–'}</b></div></div>
+   ${k.geburtstag?`<div class="small">Geburtstag: ${fmtDate(k.geburtstag)}</div>`:''}${k.adresse?`<div class="small">Anschrift: ${esc(k.adresse)}</div>`:''}
+   ${k.notiz?`<div class="notice info" style="margin-top:8px">${esc(k.notiz)}</div>`:''}
+   <div class="small" style="margin-top:8px">${k.fotoEinwilligung?`<span class="pill ok">Foto-Einwilligung seit ${fmtDate(k.einwilligungDatum)}</span>`:'<span class="pill warn">Keine Foto-Einwilligung</span>'}</div></div>
+  <div class="card" style="margin-top:16px"><h3>Besuche & Arbeiten</h3>${besuche.length?besuche.map(b=>`<div class="visit"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${fmtDate(b.datum)}${b.zeit?' · '+esc(b.zeit):''}</b><span class="num">${b.betrag?eur(b.betrag):''} <button class="btn sm" data-act="besuch-edit" data-kunde="${k.id}" data-id="${b.id}">Bearbeiten</button></span></div>
+    <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
+    ${(b.fotos||[]).length?`<div class="thumbs">${b.fotos.map(id=>`<img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Noch keine Besuche erfasst.</div>'}</div>`;
+}
+
+function kasseBuch(){
+  const m=UI.kasseMonat;const sm=stornoMap();
+  const list=S.kasse.filter(k=>ymOf(k.datum)===m).sort((a,b)=>a.datum===b.datum?(a.nr<b.nr?-1:1):a.datum<b.datum?-1:1);
+  const ein=list.filter(k=>k.art==='einnahme'&&!isPrivat(k)).reduce((s,k)=>s+k.betrag,0);
+  const aus=list.filter(k=>k.art==='ausgabe'&&!isPrivat(k)).reduce((s,k)=>s+k.betrag,0);
+  const months=[...new Set([ymOf(today()),...S.kasse.map(k=>ymOf(k.datum))])].sort().reverse();
+  return `<div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Einnahmen im Monat</span><b>${eur(ein)}</b></div><div class="card stat"><span class="label">Ausgaben im Monat</span><b>${eur(aus)}</b></div><div class="card stat"><span class="label">${ein-aus<0?'Verlust':'Gewinn'} im Monat</span><b class="${ein-aus<0?'minus':'plus'}">${eur(ein-aus)}</b></div><div class="card stat"><span class="label">Barbestand aktuell</span><b>${eur(barbestand())}</b></div></div>
+  <div class="card"><div class="view-head" style="margin-bottom:8px"><select id="kasse-monat" style="width:auto" aria-label="Monat">${months.map(x=>`<option value="${x}" ${x===m?'selected':''}>${parseDate(x+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</option>`).join('')}</select>
+   <span class="actions"><button class="btn sm" data-act="monat-pdf">Monatsabschluss (PDF)</button><button class="btn sm" data-act="export-kasse-monat">Monat als CSV</button></span></div>
+  ${list.length?`<div class="table-wrap"><table><thead><tr><th>Beleg</th><th>Datum</th><th>Text</th><th>Zahlart</th><th class="num">Betrag</th><th></th></tr></thead><tbody>${list.map(k=>{const st=sm[k.nr];
+   return `<tr class="${st?'storno':''}"><td class="num" style="text-align:left">${esc(k.nr)}</td><td>${fmtDate(k.datum)}</td><td>${esc(k.text)}<div class="small muted">${esc(k.kategorie)}${k.kundeName?' · '+esc(k.kundeName):''}${st?' · storniert durch '+esc(st):''}</div></td><td>${ZAHLART[k.zahlart]||''}</td><td class="num ${k.art==='einnahme'?'plus':'minus'}">${k.art==='einnahme'?'+':'−'} ${eur(Math.abs(k.betrag)).replace('-','')}${k.betrag<0?' (Storno)':''}</td>
+   <td style="white-space:nowrap">${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg (${belegeOf(k).length})</button> `:k.art==='ausgabe'&&!k.stornoVon?`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button> `:''}${!st&&!k.stornoVon?`<button class="btn sm danger" data-act="storno" data-nr="${k.nr}">Storno</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">In diesem Monat noch keine Buchungen.</div>'}</div>`;
+}
+function kasseEuer(){
+  const y=UI.euerJahr;const L=S.kasse.filter(k=>String(k.datum).startsWith(y));
+  const sum=(art)=>{const m={};L.filter(k=>k.art===art&&!isPrivat(k)).forEach(k=>{m[k.kategorie]=(m[k.kategorie]||0)+k.betrag});return m};
+  const E=sum('einnahme'),A=sum('ausgabe');const tE=Object.values(E).reduce((a,b)=>a+b,0),tA=Object.values(A).reduce((a,b)=>a+b,0);
+  const umsatz=Object.entries(E).filter(([k])=>k!=='Kassendifferenz').reduce((a,[,v])=>a+v,0);
+  const vorjahr=S.kasse.filter(k=>String(k.datum).startsWith(String(Number(y)-1))&&k.art==='einnahme'&&!isPrivat(k)&&k.kategorie!=='Kassendifferenz').reduce((a,k)=>a+k.betrag,0);
+  const p25=Math.min(100,umsatz/2500000*100),p100=Math.min(100,umsatz/10000000*100);
+  const years=[...new Set([String(new Date().getFullYear()),...S.kasse.map(k=>String(k.datum).slice(0,4))])].sort().reverse();
+  const tbl=(m)=>Object.keys(m).length?`<table><tbody>${Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${eur(v)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Keine Buchungen.</div>';
+  return `<div class="view-head"><select id="euer-jahr" style="width:auto" aria-label="Jahr">${years.map(x=>`<option ${x===y?'selected':''}>${x}</option>`).join('')}</select><button class="btn sm" data-act="export-kasse-jahr">Jahr als CSV für Steuerberatung</button></div>
+  <div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Betriebseinnahmen</span><b>${eur(tE)}</b></div><div class="card stat"><span class="label">Betriebsausgaben</span><b>${eur(tA)}</b></div><div class="card stat"><span class="label">Gewinn (EÜR)</span><b class="${tE-tA<0?'minus':''}">${eur(tE-tA)}</b></div></div>
+  <div class="grid g2" style="margin-bottom:16px"><div class="card"><h3>Einnahmen nach Art</h3>${tbl(E)}</div><div class="card"><h3>Ausgaben nach Art</h3>${tbl(A)}</div></div>
+  <div class="card" style="margin-bottom:16px"><h3>Gewinn / Verlust nach Monaten</h3><div class="table-wrap"><table><thead><tr><th>Monat</th><th class="num">Einnahmen</th><th class="num">Ausgaben</th><th class="num">Ergebnis</th></tr></thead><tbody>${[...Array(12)].map((_,i)=>{const mk=y+'-'+pad(i+1);const ML=L.filter(k=>ymOf(k.datum)===mk&&!isPrivat(k));
+    const e=ML.filter(k=>k.art==='einnahme').reduce((a,k)=>a+k.betrag,0),a=ML.filter(k=>k.art==='ausgabe').reduce((s,k)=>s+k.betrag,0);if(!ML.length)return '';
+    return `<tr><td>${parseDate(mk+'-01').toLocaleDateString('de-DE',{month:'long'})}</td><td class="num">${eur(e)}</td><td class="num">${eur(a)}</td><td class="num ${e-a<0?'minus':'plus'}">${e-a<0?'Verlust ':'Gewinn '}${eur(e-a)}</td></tr>`}).join('')||'<tr><td colspan="4" class="muted">Noch keine Buchungen in diesem Jahr.</td></tr>'}
+   <tr><td><b>Jahr ${esc(y)}</b></td><td class="num"><b>${eur(tE)}</b></td><td class="num"><b>${eur(tA)}</b></td><td class="num ${tE-tA<0?'minus':'plus'}"><b>${eur(tE-tA)}</b></td></tr></tbody></table></div>
+   <p class="small muted" style="margin:10px 0 0">Als Kleingewerbe ermitteln Sie den Gewinn mit der Einnahmenüberschussrechnung (EÜR, Anlage EÜR zur Steuererklärung). Eine Bilanz ist dafür nicht nötig. Privateinlagen und -entnahmen sind nicht enthalten.</p></div>
+  <div class="card"><h3>Kleinunternehmergrenze ${esc(y)}</h3>
+   <div class="small" style="margin-bottom:4px">Umsatz ${esc(y)}: <b class="num">${eur(umsatz)}</b> von 25.000 € (Grenze für den Status im Folgejahr)</div>
+   <div class="bar ${p25>=100?'bad':p25>=80?'warn':''}"><i style="width:${p25}%"></i></div>
+   <div class="small" style="margin:10px 0 4px">Obergrenze laufendes Jahr: ${eur(umsatz)} von 100.000 €</div>
+   <div class="bar ${p100>=90?'bad':''}"><i style="width:${p100}%"></i></div>
+   <p class="small muted" style="margin:10px 0 0">Vorjahr ${Number(y)-1}: ${eur(vorjahr)}${vorjahr>2500000?' – <b class="minus">über 25.000 €: Kleinunternehmerstatus für '+esc(y)+' prüfen!</b>':''}. Privateinlagen und -entnahmen zählen nicht zum Umsatz.</p></div>`;
+}
+function kasseBelege(){
+  const m=UI.kasseMonat;const sm=stornoMap();
+  const list=S.kasse.filter(k=>ymOf(k.datum)===m&&!k.stornoVon&&!sm[k.nr]&&!isPrivat(k)&&(k.art==='ausgabe'||belegeOf(k).length)).sort((a,b)=>a.datum<b.datum?-1:1);
+  const ohne=list.filter(k=>k.art==='ausgabe'&&!belegeOf(k).length).length;
+  const months=[...new Set([ymOf(today()),...S.kasse.map(k=>ymOf(k.datum))])].sort().reverse();
+  return `<div class="view-head"><select id="kasse-monat" style="width:auto" aria-label="Monat">${months.map(x=>`<option value="${x}" ${x===m?'selected':''}>${parseDate(x+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</option>`).join('')}</select>
+   ${ohne?`<span class="pill warn">${ohne} Ausgabe${ohne>1?'n':''} ohne Beleg</span>`:list.length?'<span class="pill ok">Alle Belege vorhanden</span>':''}</div>
+  <div class="card">${list.length?list.map(k=>`<div class="visit"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${fmtDate(k.datum)} · ${esc(k.text)}</b><span class="num ${k.art==='ausgabe'?'minus':'plus'}">${eur(k.betrag)}</span></div>
+   <div class="small muted">Beleg ${esc(k.nr)} · ${esc(k.kategorie)} · ${ZAHLART[k.zahlart]||''}</div>
+   <div class="thumbs" style="align-items:center">${belegThumbs(belegeOf(k))}<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">${belegeOf(k).length?'+ Seite':'+ Beleg anhängen'}</button></div></div>`).join(''):'<div class="empty">In diesem Monat keine Ausgaben. Belege erscheinen hier, sobald eine Ausgabe gebucht ist.</div>'}</div>`;
+}
+function kasseAbschl(){
+  return `<div class="card">${S.abschluesse.length?`<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Erfasst</th><th class="num">Soll</th><th class="num">Gezählt</th><th class="num">Differenz</th></tr></thead><tbody>${S.abschluesse.map(a=>`<tr><td>${fmtDate(a.datum)}</td><td class="small">${fmtTs(a.ts)}</td><td class="num">${eur(a.soll)}</td><td class="num">${eur(a.ist)}</td><td class="num ${a.differenz<0?'minus':a.differenz>0?'plus':''}">${eur(a.differenz)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Noch kein Tagesabschluss. Am Ende jedes Arbeitstages das Bargeld zählen und „Tagesabschluss“ tippen.</div>'}</div>`;
+}
+
+/* ---------- Modal ---------- */
+function openModal(title,html,{wide=false,onMount}={}){
+  const r=$('#modal-root');
+  if(r.hidden)UI.scrollSave=window.scrollY;
+  $('#view').innerHTML='';$('#view').hidden=true;
+  r.innerHTML=`<div class="modal ${wide?'wide':''}" role="region" aria-label="${esc(title)}"><div class="modal-head"><h2>${esc(title)}</h2><button class="icon-btn" data-act="close-modal" aria-label="Schließen">×</button></div><div class="modal-body">${html}</div></div>`;
+  r.hidden=false;window.scrollTo(0,0);const m=r.querySelector('.modal');onMount&&onMount(m);
+}
+function hideModal(){const r=$('#modal-root');r.hidden=true;r.innerHTML='';$('#view').hidden=false}
+function closeModal(){const was=!$('#modal-root').hidden;hideModal();renderShell();if(was)window.scrollTo(0,UI.scrollSave||0)}
+function confirmBox(title,msg,yesLabel,onYes){
+  openModal(title,`<p style="margin:0">${msg}</p><div class="modal-foot"><button class="btn" data-act="close-modal">Abbrechen</button><button class="btn danger" id="c-yes">${esc(yesLabel)}</button></div>`,{onMount:m=>{$('#c-yes',m).onclick=async()=>{$('#c-yes',m).disabled=true;try{await onYes()}catch(e){dbFail(e)}closeModal()}}});
+}
+function kundenDatalist(){return `<datalist id="dl-kunden">${S.kunden.map(k=>`<option value="${esc(kundeLabel(k))}"></option>`).join('')}</datalist>`}
+const kundeLabel=k=>kundeName(k)+(k.telefon?' · '+k.telefon:'');
+const kundeFromLabel=v=>S.kunden.find(k=>kundeLabel(k)===v)||S.kunden.find(k=>kundeName(k).toLowerCase()===String(v).trim().toLowerCase());
+
+/* ---- Kunde ---- */
+function kundeForm(k={}){
+  openModal(k.id?'Kunde bearbeiten':'Neuer Kunde',`<form data-form="kunde" data-id="${k.id||''}" class="grid" style="gap:12px"><div class="fields">
+   ${fld('vorname','Vorname',k.vorname)}${fld('nachname','Nachname',k.nachname)}${fld('telefon','Telefon',k.telefon,'tel')}${fld('email','E-Mail',k.email,'email')}${fld('geburtstag','Geburtstag',k.geburtstag,'date')}${fld('adresse','Anschrift (für Rechnungen über 250 €)',k.adresse)}</div>
+   <div class="field"><label for="f-notiz">Notizen (Haartyp, Wünsche, Unverträglichkeiten)</label><textarea id="f-notiz" name="notiz">${esc(k.notiz||'')}</textarea></div>
+   <label class="check"><input type="checkbox" name="fotoEinwilligung" ${k.fotoEinwilligung?'checked':''}><span>Die Kundin / der Kunde ist einverstanden, dass Vorher-/Nachher-Fotos zur Dokumentation gespeichert werden (DSGVO-Einwilligung).</span></label>
+   <div class="modal-foot">${k.id?'<button type="button" class="btn danger" data-act="kunde-del" data-id="'+k.id+'" style="margin-right:auto">Kundenkarte löschen</button>':''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
+}
+
+/* ---- Termin ---- */
+function terminForm(t={},doc){
+  const L=leistungen();const k=kundeById(t.kundeId);
+  openModal(t.id?'Termin':'Neuer Termin',`<form data-form="termin" data-id="${t.id||''}" data-doc="${doc||''}" class="grid" style="gap:12px">
+   <div class="field"><label for="t-kunde">Kunde</label><input id="t-kunde" name="kunde" list="dl-kunden" value="${esc(k?kundeLabel(k):t.name||'')}" placeholder="Name eingeben oder auswählen" autocomplete="off">${kundenDatalist()}</div>
+   <div class="fields">${fld('datum','Datum',t.datum||UI.terminDatum,'date')}${fld('zeit','Uhrzeit',t.zeit||'09:00','time','step="300"')}
+   <div class="field"><label for="t-leistung">Leistung</label><select id="t-leistung" name="leistung"><option value="">– wählen –</option>${L.map(l=>`<option data-dauer="${num(l.dauer)}" ${t.leistung===l.name?'selected':''}>${esc(l.name)}</option>`).join('')}${t.leistung&&!L.some(l=>l.name===t.leistung)?`<option selected>${esc(t.leistung)}</option>`:''}</select></div>
+   ${fld('dauer','Dauer (Min)',t.dauer||30,'number','min="5" step="5"')}</div>
+   <div class="field"><label for="f-tnotiz">Notiz</label><input id="f-tnotiz" name="notiz" value="${esc(t.notiz||'')}"></div>
+   ${t.id?`<div class="field"><span class="label">Status</span><div class="seg" role="group">${[['geplant','Geplant'],['erledigt','Erledigt'],['abgesagt','Abgesagt']].map(([v,l])=>`<button type="button" data-act="seg" data-name="status" data-v="${v}" aria-pressed="${(t.status||'geplant')===v}">${l}</button>`).join('')}</div><input type="hidden" name="status" value="${t.status||'geplant'}"></div>`:''}
+   <div class="modal-foot">${t.id?`<button type="button" class="btn danger" data-act="termin-del" data-id="${t.id}" data-doc="${doc}" style="margin-right:auto">Löschen</button><button type="button" class="btn" data-act="besuch-aus-termin" data-id="${t.id}" data-doc="${doc}">Besuch erfassen</button>`:''}<button class="btn primary">Speichern</button></div></form>`,
+  {onMount:m=>{$('#t-leistung',m).onchange=e=>{const o=e.target.selectedOptions[0];if(o&&o.dataset.dauer)m.querySelector('[name=dauer]').value=o.dataset.dauer}}});
+}
+
+/* ---- Besuch (Arbeit + Fotos + Kassieren) ---- */
+let pending={files:[],keep:[],removed:[],verbrauch:[]};
+function besuchForm(kundeId,b={},fromTermin){
+  const k=kundeById(kundeId);const L=leistungen();const neu=!b.id;
+  pending={files:[],keep:[...(b.fotos||[])],removed:[],verbrauch:[]};
+  const sel=new Set(b.leistungen||(fromTermin&&fromTermin.leistung?[fromTermin.leistung]:[]));
+  const fotoOk=k&&k.fotoEinwilligung;
+  openModal(neu?'Besuch erfassen – '+kundeName(k):'Besuch bearbeiten',`<form data-form="besuch" data-kunde="${kundeId}" data-id="${b.id||''}" data-termin="${fromTermin?fromTermin.id:''}" data-tdoc="${fromTermin?fromTermin._doc:''}" class="grid" style="gap:14px">
+   <div class="fields">${fld('datum','Datum',b.datum||today(),'date')}${fld('zeit','Uhrzeit',b.zeit||(fromTermin&&fromTermin.zeit)||nowTime(),'time')}</div>
+   <div class="field"><span class="label">Leistungen</span><div class="chips" id="b-chips">${L.map(l=>`<button type="button" class="chip" data-act="chip" data-name="${esc(l.name)}" data-preis="${l.preis||0}" aria-pressed="${sel.has(l.name)}">${esc(l.name)}${l.preis?' · '+eur(l.preis):''}</button>`).join('')}</div></div>
+   <div class="field"><label for="f-rezeptur">Farbe / Rezeptur</label><textarea id="f-rezeptur" name="rezeptur" placeholder="z. B. Ansatz 7/1 + 8/0 (1:1), Oxidant 6 %, Einwirkzeit 35 Min">${esc(b.rezeptur||'')}</textarea></div>
+   <div class="field"><label for="f-bnotiz">Notiz</label><input id="f-bnotiz" name="notiz" value="${esc(b.notiz||'')}"></div>
+   <div class="field"><span class="label">Fotos (max. 4)</span>${fotoOk?(assets?`<div class="thumbs" id="b-thumbs"></div><label class="btn" style="align-self:flex-start">Foto aufnehmen / wählen<input type="file" accept="image/*" id="b-foto" multiple hidden></label>`:'<div class="small muted">Fotos können in dieser Ansicht nicht gespeichert werden.</div>'):'<div class="notice">Keine Foto-Einwilligung in der Kundenkarte. Erst die Einwilligung einholen und dort abhaken.</div>'}</div>
+   ${neu?`<div class="field"><span class="label">Verbrauchtes Material (wird vom Lager abgebucht)</span><div id="b-verbrauch" class="grid" style="gap:6px"></div>
+     <div class="actions"><select id="b-art" style="width:auto;flex:1" aria-label="Artikel"><option value="">Artikel wählen …</option>${S.artikel.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).map(a=>`<option value="${a.id}">${esc(a.name)} (${num(a.bestand)})</option>`).join('')}</select><button type="button" class="btn sm" data-act="b-art-add">Hinzufügen</button><button type="button" class="btn sm" data-act="b-art-scan">Scannen</button></div></div>
+`:''}
+   <div class="modal-foot">${!neu?`<button type="button" class="btn danger" data-act="besuch-del" data-kunde="${kundeId}" data-id="${b.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary" id="b-save">Speichern</button></div></form>`,
+  {wide:true,onMount:m=>{
+    renderThumbs();
+    const fi=$('#b-foto',m);if(fi)fi.onchange=()=>{const room=4-pending.keep.length-pending.files.length;[...fi.files].slice(0,Math.max(0,room)).forEach(f=>pending.files.push(f));if(fi.files.length>room)toast('Maximal 4 Fotos pro Besuch.');fi.value='';renderThumbs()};
+    
+  }});
+}
+function renderThumbs(){const t=$('#b-thumbs');if(!t)return;
+  t.innerHTML=pending.keep.map(id=>`<div class="thumb-wrap"><img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Gespeichertes Foto"><button type="button" data-act="thumb-del" data-id="${id}" aria-label="Foto entfernen">×</button></div>`).join('')+
+  pending.files.map((f,i)=>`<div class="thumb-wrap"><img class="thumb" src="${URL.createObjectURL(f)}" alt="Neues Foto"><button type="button" data-act="thumb-del-new" data-i="${i}" aria-label="Foto entfernen">×</button></div>`).join('');}
+function sumChips(scope){const f=(scope&&scope.closest&&scope.closest('form'))||(scope&&scope.querySelector&&scope.querySelector('form'))||document;const inp=f.querySelector('[name=betrag]');if(!inp)return;const s=$$('.chip[aria-pressed="true"]',f).reduce((a,c)=>a+Number(c.dataset.preis||0),0);inp.value=s?eurPlain(s):''}
+function renderVerbrauch(){const box=$('#b-verbrauch');if(!box)return;box.innerHTML=pending.verbrauch.map((v,i)=>{const a=S.artikel.find(x=>x.id===v.id);return `<div class="row" style="padding:6px 0"><div class="grow">${esc(a?a.name:'?')}</div><input type="number" min="0.1" step="0.1" value="${v.menge}" data-vi="${i}" style="width:90px" aria-label="Menge"><span class="small muted">${esc(a&&a.einheit||'Stk')}</span><button type="button" class="btn sm danger" data-act="v-del" data-i="${i}" aria-label="Entfernen">×</button></div>`}).join('')}
+
+/* ---- Artikel ---- */
+function artikelForm(a={}){
+  openModal(a.id?'Artikel bearbeiten':'Neuer Artikel',`<form data-form="artikel" data-id="${a.id||''}" class="grid" style="gap:12px"><div class="fields">
+   ${fld('name','Bezeichnung (z. B. Koleston 7/1)',a.name)}${fld('marke','Marke / Hersteller',a.marke)}
+   <div class="field"><label for="f-ean">EAN / Barcode</label><div class="actions" style="flex-wrap:nowrap"><input id="f-ean" name="ean" value="${esc(a.ean||'')}" inputmode="numeric"><button type="button" class="btn sm" data-act="ean-scan">Scannen</button></div></div>
+   <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option ${a.kategorie===k?'selected':''}>${k}</option>`).join('')}</select></div>
+   ${fld('einheit','Einheit',a.einheit||'Stk')}${a.id?'':fld('bestand','Anfangsbestand',a.bestand||0,'number','step="any" min="0"')}${fld('minBestand','Mindestbestand (Warnung)',a.minBestand||0,'number','step="any" min="0"')}
+   ${fld('ekPreis','Einkaufspreis (€)',a.ekPreis?eurPlain(a.ekPreis):'','text','inputmode="decimal"')}${fld('vkPreis','Verkaufspreis (€, bei Verkaufsware)',a.vkPreis?eurPlain(a.vkPreis):'','text','inputmode="decimal"')}${fld('mhd','Haltbar bis (MHD)',a.mhd,'date')}</div>
+   <div class="modal-foot">${a.id?`<button type="button" class="btn danger" data-act="artikel-del" data-id="${a.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
+}
+function artikelAktion(a){
+  const hist=S.bewegungen.filter(b=>b.artikelId===a.id).sort((x,y)=>x.ts<y.ts?1:-1).slice(0,12);
+  const ARTL={zugang:'Eingang',abgang:'Ausgang',verbrauch:'Verbrauch',verkauf:'Verkauf',inventur:'Inventur'};
+  openModal(a.name,`<div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div>
+   <div class="grid g3" style="gap:10px"><div class="card stat"><span class="label">Bestand</span><b>${num(a.bestand)} ${esc(a.einheit||'Stk')}</b></div><div class="card stat"><span class="label">Mindestbestand</span><b>${num(a.minBestand)}</b></div><div class="card stat"><span class="label">VK-Preis</span><b>${a.vkPreis?eur(a.vkPreis):'–'}</b></div></div>
+   ${a.suche==='offen'?'<div class="notice info">Name und Hersteller werden gerade automatisch gesucht.</div>':a.suche==='nicht_gefunden'?'<div class="notice">Für diesen Barcode wurde im Internet nichts gefunden. Bitte über „Bearbeiten“ selbst eintragen.</div>':''}
+   ${a.info?`<div class="small muted">${esc(a.info)}</div>`:''}${a.mhd?`<div class="small">Haltbar bis: <b>${fmtDate(a.mhd)}</b></div>`:''}
+   <div class="fields" style="align-items:end"><div class="field"><label for="aa-menge">Menge</label><input id="aa-menge" type="number" min="0" step="any" value="1"></div>${fld('aa-notiz','Notiz (z. B. Lieferant, Rechnung)','')}${fld('aa-mhd','Haltbar bis (bei Eingang, optional)','','date')}</div>
+   <div class="actions"><button class="btn ok" data-act="aa" data-k="zugang" data-id="${a.id}">+ Eingang</button><button class="btn" data-act="aa" data-k="verbrauch" data-id="${a.id}">− Verbrauch</button><button class="btn" data-act="aa" data-k="verkauf" data-id="${a.id}">− Verkauft</button><button class="btn" data-act="aa" data-k="inventur" data-id="${a.id}">Inventur: Bestand = Menge</button><button class="btn" data-act="artikel-edit" data-id="${a.id}" style="margin-left:auto">Bearbeiten</button></div>
+   <div><div class="label" style="margin-bottom:4px">Letzte Bewegungen</div>${hist.length?`<div class="table-wrap"><table><tbody>${hist.map(h=>`<tr><td class="small">${fmtTs(h.ts)}</td><td>${ARTL[h.art]||h.art}${h.notiz?' <span class="small muted">'+esc(h.notiz)+'</span>':''}</td><td class="num ${h.menge<0?'minus':'plus'}">${h.menge>0?'+':''}${h.menge}</td><td class="num muted">→ ${h.bestandNach}</td></tr>`).join('')}</tbody></table></div>`:'<div class="small muted">Noch keine Bewegungen.</div>'}</div>`,{wide:true});
+}
+function lookupEan(code){
+  const a=S.artikel.find(x=>String(x.ean||'').trim()===code);
+  if(a)artikelAktion(a);else neuScanForm(code);
+}
+function neuScanForm(code){
+  openModal('Neuer Barcode',`<form data-form="scanneu" data-ean="${esc(code)}" class="grid" style="gap:12px">
+   <div class="notice info">Barcode <b class="num">${esc(code)}</b> ist neu. Name und Hersteller werden automatisch in einer freien Produktdatenbank gesucht (sobald Internet da ist). Profi-Haarfarben sind dort nicht immer enthalten – dann den Namen einmal selbst eintragen.</div>
+   <div class="fields">${fld('name','Bezeichnung (optional)','')}
+   <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option>${k}</option>`).join('')}</select></div>
+   ${fld('menge','Menge (Eingang)',1,'number','min="0" step="any"')}${fld('mhd','Haltbar bis (optional)','','date')}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="scan-full" data-ean="${esc(code)}" style="margin-right:auto">Alle Angaben selbst eingeben</button><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
+}
+function mhdInfo(a){if(!a.mhd)return null;const d=Math.round((parseDate(a.mhd)-parseDate(today()))/864e5);return d<0?{cls:'bad',txt:'abgelaufen '+fmtDate(a.mhd)}:d<=60?{cls:'warn',txt:'MHD '+fmtDate(a.mhd)}:{cls:'',txt:'MHD '+fmtDate(a.mhd)}}
+function artikelPills(a){const m=mhdInfo(a);return (a.suche==='offen'?'<span class="pill acc">wird gesucht</span>':a.suche==='nicht_gefunden'?'<span class="pill warn">Name selbst eintragen</span>':'')+(m&&m.cls?`<span class="pill ${m.cls}">${m.txt}</span>`:'')}
+
+/* ---- Kasse: Einnahme / Ausgabe ---- */
+let belegFiles=[];
+const belegeOf=k=>[...(k.belege||[]),...(k.belegFoto?[{id:k.belegFoto,typ:'bild'}]:[])];
+async function uploadBeleg(file){
+  if(!assets)throw {code:'not_granted'};
+  if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){const r=await assets.upload(file,{type:'application/pdf'});return {id:r.id,typ:'pdf'}}
+  return {id:await uploadFoto(file),typ:'bild'};
+}
+function belegThumbs(list){return list.map(b=>b.typ==='pdf'?`<a class="pill acc" href="#" data-bid-open="${b.id}">PDF öffnen</a>`:`<img class="thumb" data-bid="${b.id}" src="${blobUrl(b.id)}" alt="Beleg" data-act="foto" data-id="${b.id}" loading="lazy">`).join('')}
+function kasseFormHtml(art,pre={}){
+  const ein=art==='einnahme';const L=leistungen();const k=kundeById(pre.kundeId);const za=pre.zahlart||'bar';const inl=!!pre.inline;
+  return `<form data-form="kasse" data-art="${art}" data-inline="${inl?'1':''}" data-wk="${esc(pre.wkId||'')}" data-wkm="${esc(pre.wkMonat||'')}" class="grid" style="gap:14px">
+   ${ein?`<div class="field"><span class="label">Leistungen antippen</span><div class="chips" id="b-chips">${L.map(l=>`<button type="button" class="chip" data-act="chip" data-name="${esc(l.name)}" data-preis="${l.preis||0}" aria-pressed="false">${esc(l.name)}${l.preis?' · '+eur(l.preis):''}</button>`).join('')}</div></div>`:''}
+   <div class="fields"><div class="field"><label for="f-betrag">Betrag (€)</label><input id="f-betrag" name="betrag" inputmode="decimal" placeholder="0,00" value="${pre.betrag?eurPlain(pre.betrag):''}"></div>
+   <div class="field"><span class="label">Zahlart</span><div class="seg" role="group">${Object.entries(ZAHLART).map(([v,l])=>`<button type="button" data-act="seg" data-name="zahlart" data-v="${v}" aria-pressed="${v===za}">${l}</button>`).join('')}</div><input type="hidden" name="zahlart" value="${za}"></div></div>
+   ${ein?`<div class="field"><label for="k-kunde">Kunde (optional)</label><input id="k-kunde" name="kunde" list="dl-kunden" value="${esc(k?kundeLabel(k):'')}" autocomplete="off">${kundenDatalist()}</div>`:''}
+   <div class="fields"><div class="field"><label for="f-kkat">Kategorie</label><select id="f-kkat" name="kategorie">${(ein?EIN_KAT:AUS_KAT).map(c=>`<option ${(pre.kategorie||(ein?'Dienstleistung':''))===c?'selected':''}>${c}</option>`).join('')}</select></div>
+   ${fld('datum','Datum',pre.datum||today(),'date')}</div>
+   <div class="field"><label for="f-ktext">Buchungstext${ein?' (optional)':''}</label><input id="f-ktext" name="text" value="${esc(pre.text||'')}" placeholder="${ein?'wird aus den Leistungen übernommen':'z. B. Farben Großhandel, Rechnung 4711'}"></div>
+   ${assets?`<div class="field"><span class="label">Rechnung / Beleg (Foto oder PDF, bis 4 Seiten)</span>${art==='ausgabe'?'<span class="small muted" id="ocr-status">Foto der Rechnung aufnehmen – Betrag, Datum und Firma werden automatisch gelesen.</span>':''}<div class="thumbs" id="k-thumbs"></div><label class="btn" style="align-self:flex-start">Beleg fotografieren / wählen<input type="file" accept="image/*,application/pdf" id="k-beleg" multiple hidden></label></div>`:''}
+   ${inl?`<button class="btn primary pos-go">${ein?'Kassieren':'Ausgabe buchen'}</button>`:`<div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Buchen</button></div>`}
+   <p class="small muted" style="margin:0">Buchungen können später nicht geändert, nur storniert werden. Belege lassen sich jederzeit nachreichen.</p></form>`;
+}
+function kasseForm(art,pre={}){belegFiles=[];openModal(art==='einnahme'?'Einnahme buchen':'Ausgabe buchen',kasseFormHtml(art,pre))}
+function kasseTag(){
+  const d=UI.tagDatum||today();const sm=stornoMap();
+  const vorh=S.kasse.filter(k=>k.datum===d&&k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr]);
+  const abgeschl=S.abschluesse.find(a=>a.datum===d);
+  const barAusg=S.kasse.filter(k=>k.datum===d&&k.zahlart==='bar'&&!k.tagesEinnahme&&k.kategorie!=='Kassendifferenz');
+  const letzte=S.abschluesse.filter(a=>a.datum<d).sort((a,b)=>a.datum<b.datum?1:-1)[0];
+  const tage=[...new Set(S.kasse.filter(k=>k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr]).map(k=>k.datum))].sort().reverse().slice(0,10);
+  return `<div class="pos"><div class="card grid" style="gap:14px"><h2>Tageseinnahmen</h2>${UI.askBackup?'<div class="notice ok" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><span>Gespeichert. Jetzt noch die Tagessicherung erstellen?</span><button class="btn sm primary" data-act="sicherung">Sicherung erstellen</button></div>':''}
+   ${vorh.length?`<div class="notice ok">Für den ${fmtDate(d)} sind die Einnahmen bereits eingetragen: ${vorh.map(k=>`${ZAHLART[k.zahlart]} <b>${eur(k.betrag)}</b>`).join(' · ')}. Bei einem Fehler im Kassenbuch stornieren und neu eintragen.</div>`:
+   `<form data-form="tag" class="grid" style="gap:14px">
+    ${fld('datum','Datum',d,'date')}
+    <div class="fields"><div class="field"><label for="f-bar">Bar-Einnahmen (€)</label><input id="f-bar" name="bar" inputmode="decimal" placeholder="0,00" class="big-in"></div>
+    <div class="field"><label for="f-karte">Karte – SumUp Tagesumsatz (€)</label><input id="f-karte" name="karte" inputmode="decimal" placeholder="0,00" class="big-in"></div></div>
+    <div class="field"><label for="f-gezaehlt">Bargeld in der Kasse gezählt (€) – Kassensturz</label><input id="f-gezaehlt" name="gezaehlt" inputmode="decimal" placeholder="0,00"><span class="small muted" id="tag-check">Sollbestand wird nach Eingabe der Bar-Einnahmen berechnet.</span></div>
+    ${fld('notiz','Notiz (optional)','')}
+    ${assets?`<div class="field"><span class="label">SumUp-Tagesbericht / Zettel fotografieren (optional)</span><div class="thumbs" id="k-thumbs"></div><label class="btn" style="align-self:flex-start">Foto aufnehmen / wählen<input type="file" accept="image/*,application/pdf" id="k-beleg" multiple hidden></label></div>`:''}
+    <button class="btn primary pos-go">Tageseinnahmen speichern</button>
+    <p class="small muted" style="margin:0">Barausgaben von heute (${eur(barAusg.filter(k=>k.art==='ausgabe').reduce((s,k)=>s+k.betrag,0))}) sind im Sollbestand schon berücksichtigt. Kartenzahlungen landen über SumUp auf dem Konto.</p></form>`}
+   </div>
+   <div class="card"><h3>Kasse</h3><div class="grid g2" style="gap:10px;margin-bottom:10px">
+    <div><div class="label">Barbestand laut Buch</div><b class="num">${eur(barbestand())}</b></div>
+    <div><div class="label">Letzter Kassensturz</div><b>${letzte||abgeschl?fmtDate((abgeschl||letzte).datum):'–'}</b></div></div>
+    <div class="label" style="margin-bottom:4px">Zuletzt eingetragen</div>
+    ${tage.length?`<div class="list">${tage.map(t=>{const L=S.kasse.filter(k=>k.datum===t&&k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr]);const g=L.reduce((a,k)=>a+k.betrag,0);
+      return `<div class="row"><div class="grow"><div class="title">${fmtDate(t)}</div><div class="small muted">${L.map(k=>ZAHLART[k.zahlart]+' '+eur(k.betrag)).join(' · ')}</div></div><b class="num">${eur(g)}</b></div>`}).join('')}</div>`:'<div class="empty" style="padding:14px">Noch keine Tageseinnahmen.</div>'}
+    <div class="actions" style="margin-top:10px"><button class="btn" data-act="ausgabe-page" style="flex:1">Ausgabe buchen</button></div></div></div>`;
+}
+function kasseAus(){
+  const m=ymOf(today());const sm=stornoMap();
+  const list=S.kasse.filter(k=>ymOf(k.datum)===m&&k.art==='ausgabe'&&k.kategorie!=='Kassendifferenz').sort((a,b)=>a.nr<b.nr?1:-1);
+  const sum=list.filter(k=>!k.stornoVon&&!sm[k.nr]&&!isPrivat(k)).reduce((a,k)=>a+k.betrag,0);
+  const last=UI.lastBooking&&S.kasse.find(k=>k.nr===UI.lastBooking&&k.art==='ausgabe');
+  return `<div class="pos"><div class="card grid" style="gap:14px"><h2>Ausgabe buchen</h2>
+   ${last?`<div class="notice ok">Beleg <b>${esc(last.nr)}</b> über <b>${eur(last.betrag)}</b> gebucht.</div>`:''}
+   <div id="pos-form">${kasseFormHtml('ausgabe',{inline:true,kategorie:'Wareneinkauf',zahlart:'ueberweisung'})}</div></div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h3 style="margin:0">Ausgaben ${parseDate(m+'-01').toLocaleDateString('de-DE',{month:'long'})}</h3><b class="num">${eur(sum)}</b></div>
+    ${list.length?`<div class="list">${list.map(k=>`<div class="row"><div class="grow"><div class="title ${sm[k.nr]||k.stornoVon?'muted':''}">${esc(k.text)}</div><div class="small muted">${fmtDate(k.datum)} · ${esc(k.kategorie)} · ${ZAHLART[k.zahlart]||''}${sm[k.nr]?' · storniert':''}</div></div><span class="num minus">${eur(k.betrag)}</span>${belegeOf(k).length?`<button class="btn sm" data-act="beleg-show" data-nr="${k.nr}">Beleg</button>`:k.stornoVon?'':`<button class="btn sm" data-act="beleg-add" data-nr="${k.nr}">+ Beleg</button>`}</div>`).join('')}</div>`:'<div class="empty" style="padding:14px">In diesem Monat noch keine Ausgaben.</div>'}</div></div>`;
+}
+function tagCheck(){const el=$('#tag-check');if(!el)return;const bar=parseEur($('#f-bar').value)||0;const gz=parseEur($('#f-gezaehlt').value);
+  const soll=barbestand()+bar;if(isNaN(gz)){el.innerHTML=`Sollbestand: <b>${eur(soll)}</b>`;return}
+  const df=gz-soll;el.innerHTML=`Sollbestand ${eur(soll)} · gezählt ${eur(gz)} · `+(df===0?'<span class="pill ok">stimmt</span>':`<span class="pill ${df<0?'bad':'warn'}">Differenz ${eur(df)}</span>`)}
+/* PIN-Schutz für Einstellungen */
+async function pinHash(pin){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('seen-salon:'+pin));return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+function lockScreen(mode){const app=mode==='app';const neu=!S.settings.pinHash&&!app;const pin=UI.pin||'';
+  if(UI.showRecovery)return `<div class="card grid" style="gap:14px;max-width:420px;margin:24px auto;text-align:center"><h2>Notfall-Code aufschreiben</h2>
+   <p class="small" style="margin:0">Wenn die PIN vergessen wird, öffnet nur dieser Code die App wieder. Bitte jetzt auf Papier notieren und sicher aufbewahren. Er wird nur dieses eine Mal angezeigt.</p>
+   <div style="font:700 2rem ui-monospace,Menlo,monospace;letter-spacing:.1em">${esc(UI.showRecovery)}</div><button class="btn primary" data-act="recovery-ok">Notiert</button></div>`;
+  if(UI.pinRecover)return `<form data-form="recover" class="card grid" style="gap:14px;max-width:380px;margin:24px auto;text-align:center"><h2>PIN vergessen</h2>
+   <p class="small muted" style="margin:0">Notfall-Code eingeben (wurde beim Festlegen der PIN angezeigt).</p><input name="code" autocomplete="off" autocapitalize="characters" style="text-align:center;font-size:1.3rem" placeholder="XXXXX-XXXXX">
+   <button class="btn primary">Entsperren</button><button type="button" class="btn" data-act="recover-cancel">Zurück</button></form>`;
+  return `<div class="card grid" style="gap:14px;max-width:380px;margin:24px auto;text-align:center"><h2>${app?'SEEN Salon gesperrt':neu?(UI.pinFirst?'PIN wiederholen':'PIN festlegen'):'Einstellungen gesperrt'}</h2>
+   <p class="small muted" style="margin:0">${neu?'Legen Sie eine PIN (4–6 Ziffern) fest. Sie schützt Preise, Betriebsdaten und Einstellungen.':'Bitte PIN eingeben.'}</p>
+   <div class="pin-dots" aria-live="polite">${[...Array(6)].map((_,i)=>`<i class="${i<pin.length?'on':''}"></i>`).join('')}</div>
+   <div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','⌫'].map(x=>x?`<button type="button" data-act="pin-key" data-k="${x}" aria-label="${x==='⌫'?'Löschen':x}">${x}</button>`:'<span></span>').join('')}</div>
+   <button class="btn primary" data-act="pin-ok">${neu?'Weiter':'Entsperren'}</button>
+   ${neu?'':'<button class="btn sm" data-act="pin-forgot" style="justify-self:center">PIN vergessen?</button>'}</div>`}
+async function pinOk(){const pin=UI.pin||'';if(pin.length<4){toast('Bitte mindestens 4 Ziffern.');return}
+  if(UI.appLocked){if(await pinHash(pin)===S.settings.pinHash){UI.appLocked=false;UI.pin='';lastActive=Date.now();renderNav();renderShell()}else{UI.pin='';toast('Falsche PIN.');renderBody()}return}
+  if(!S.settings.pinHash){if(!UI.pinFirst){UI.pinFirst=pin;UI.pin='';renderBody();return}
+    if(UI.pinFirst!==pin){UI.pinFirst=null;UI.pin='';toast('Die PINs stimmen nicht überein. Bitte neu festlegen.');renderBody();return}
+    const code=recoveryCode();const h=await pinHash(pin),rh=await pinHash('R:'+code);
+    await mutate('settings/main',d=>({...d,pinHash:h,recoveryHash:rh}));UI.pinFirst=null;UI.pin='';UI.unlocked=true;UI.showRecovery=code;renderShell();return}
+  if(await pinHash(pin)===S.settings.pinHash){UI.unlocked=true;UI.pin='';renderShell()}else{UI.pin='';toast('Falsche PIN.');renderBody()}}
+function renderBelegFiles(){const t=$('#k-thumbs');if(!t)return;t.innerHTML=belegFiles.map((f,i)=>`<div class="thumb-wrap">${/pdf/.test(f.type)||/\.pdf$/i.test(f.name)?`<div class="thumb" style="display:grid;place-items:center;font-weight:700">PDF</div>`:`<img class="thumb" src="${URL.createObjectURL(f)}" alt="Beleg-Seite ${i+1}">`}<button type="button" data-act="kb-del" data-i="${i}" aria-label="Seite entfernen">×</button></div>`).join('')}
+let belegTarget=null;
+function belegNachreichen(nr){belegTarget=nr;const i=$('#beleg-input');i.value='';i.click()}
+async function belegNachreichenUpload(files){
+  const e=S.kasse.find(x=>x.nr===belegTarget);if(!e||!files.length)return;
+  toast('Beleg wird gespeichert …',8000);
+  try{const neu=[];for(const f of [...files].slice(0,4))neu.push(await uploadBeleg(f));
+    await mutate('kasse/'+ymOf(e.datum),d=>{(d.entries||[]).forEach(x=>{if(x.nr===e.nr)x.belege=[...(x.belege||[]),...neu]});return d});
+    toast('Beleg zu '+e.nr+' gespeichert')}catch(err){dbFail(err)}
+}
+function faellig(){const t=today();const ym=ymOf(t);const day=Number(t.slice(8));const sm=stornoMap();
+  return (S.settings.wiederkehrend||[]).filter(w=>w.text&&Number(w.tag||1)<=day&&!S.kasse.some(k=>k.wkId===w.id&&k.wkMonat===ym&&!k.stornoVon&&!sm[k.nr]))}
+function faelligCard(){const f=faellig();if(!f.length)return '';
+  return `<div class="card" style="margin-bottom:16px;border-color:var(--warn)"><h3>Fällige Abbuchungen diesen Monat</h3><div class="list">${f.map(w=>`<div class="row"><div class="grow"><div class="title">${esc(w.text)}</div><div class="small muted">${esc(w.kategorie)} · jeweils am ${w.tag}.</div></div><span class="num">${w.betrag?eur(w.betrag):''}</span><button class="btn sm primary" data-act="wk-buchen" data-id="${w.id}">Buchen</button></div>`).join('')}</div><p class="small muted" style="margin:8px 0 0">Betrag mit dem Kontoauszug vergleichen und bei Bedarf anpassen.</p></div>`}
+function wkRow(w){return `<div class="fields wk-row" style="grid-template-columns:2fr 1fr 1.4fr .8fr auto;align-items:end"><input name="w-text" value="${esc(w.text||'')}" placeholder="z. B. Telefon Telekom" aria-label="Bezeichnung"><input name="w-betrag" value="${w.betrag?eurPlain(w.betrag):''}" inputmode="decimal" placeholder="Betrag €" aria-label="Betrag"><select name="w-kat" aria-label="Kategorie">${AUS_KAT.map(c=>`<option ${w.kategorie===c?'selected':''}>${c}</option>`).join('')}</select><input name="w-tag" type="number" min="1" max="28" value="${w.tag||1}" aria-label="Abbuchungstag im Monat"><button type="button" class="btn sm danger" data-act="w-del" aria-label="Entfernen">×</button></div>`}
+function nachBuchung(e){
+  openModal('Gebucht',`<p style="margin:0">Beleg <b>${esc(e.nr)}</b> über <b>${eur(e.betrag)}</b> wurde ins Kassenbuch eingetragen.</p><div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button>${e.art==='einnahme'&&!isPrivat(e)?`<button class="btn primary" data-act="quittung" data-nr="${e.nr}">Quittung als PDF</button>`:''}</div>`);
+}
+
+/* ---- Tagesabschluss ---- */
+function abschlussForm(){
+  const soll=barbestand();const t=today();
+  openModal('Tagesabschluss '+fmtDate(t),`<div class="grid g2" style="gap:10px"><div class="card stat"><span class="label">Soll-Bestand laut Kassenbuch</span><b>${eur(soll)}</b></div><div class="card stat"><span class="label">Gezählt</span><b id="z-sum">${eur(0)}</b><span class="small" id="z-diff"></span></div></div>
+   <div class="label">Zählprotokoll – Anzahl je Schein / Münze</div>
+   <form data-form="abschluss" data-soll="${soll}" class="grid" style="gap:12px"><div class="denoms">${DENOMS.map(d=>`<div class="denom"><span>${d>=100?(d/100)+' €':d+' ct'}</span><input type="number" min="0" step="1" inputmode="numeric" name="d${d}" aria-label="Anzahl ${d>=100?(d/100)+' Euro':d+' Cent'}" placeholder="0"></div>`).join('')}</div>
+   <p class="small muted" style="margin:0">Eine Differenz wird automatisch als „Kassendifferenz“ gebucht.</p>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Abschluss speichern</button></div></form>`,
+  {wide:true,onMount:m=>{m.addEventListener('input',()=>{const ist=DENOMS.reduce((s,d)=>s+d*(parseInt(m.querySelector(`[name=d${d}]`).value)||0),0);$('#z-sum',m).textContent=eur(ist);const df=ist-soll;$('#z-diff',m).innerHTML=df===0?'<span class="pill ok">stimmt</span>':`<span class="pill ${df<0?'bad':'warn'}">Differenz ${eur(df)}</span>`})}});
+}
+
+/* ---- Quittung PDF ---- */
+function quittungPDF(e){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a5'});const s=S.settings;const W=148,x=14;let y=16;
+  const k=kundeById(e.kundeId);
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(s.firma||'SEEN Salon',x,y);y+=6;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);
+  [s.inhaber,...String(s.adresse||'').split(/,\s*|\n/),[s.telefon?'Tel. '+s.telefon:'',s.email].filter(Boolean).join(' · '),s.steuernummer?'Steuernummer: '+s.steuernummer:''].filter(Boolean).forEach(l=>{doc.text(l,x,y);y+=4.3});
+  y+=6;doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text((e.betrag>25000?'Rechnung':'Quittung')+' Nr. '+e.nr,x,y);y+=6;
+  doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+  doc.text('Rechnungs- und Leistungsdatum: '+fmtDate(e.datum),x,y);y+=5;
+  if(k||e.kundeName){doc.text('Kunde: '+(k?kundeName(k):e.kundeName),x,y);y+=5;if(k&&k.adresse){doc.text(k.adresse,x+13,y);y+=5}}
+  y+=3;doc.setDrawColor(180);doc.line(x,y,W-x,y);y+=6;
+  const pos=(e.positionen&&e.positionen.length)?e.positionen:[{text:e.text,betrag:e.betrag}];
+  pos.forEach(p=>{const lines=doc.splitTextToSize(String(p.text||''),W-2*x-30);doc.text(lines,x,y);doc.text(eurPlain(p.betrag)+' EUR',W-x,y,{align:'right'});y+=5*lines.length+1});
+  if(e.positionen&&e.positionen.length){const diff=e.betrag-e.positionen.reduce((a,p)=>a+p.betrag,0);if(diff){doc.text(diff<0?'Nachlass':'Sonstiges',x,y);doc.text(eurPlain(diff)+' EUR',W-x,y,{align:'right'});y+=6}}
+  doc.line(x,y,W-x,y);y+=6;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Gesamtbetrag',x,y);doc.text(eurPlain(e.betrag)+' EUR',W-x,y,{align:'right'});y+=7;
+  doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text('Bezahlt: '+({bar:'bar',karte:'mit Karte',ueberweisung:'per Überweisung'}[e.zahlart]||''),x,y);y+=9;
+  doc.setFontSize(8.5);doc.text('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.',x,y);y+=10;doc.text('Vielen Dank für Ihren Besuch!',x,y);
+  return doc.output('blob');
+}
+
+/* ---------- Ereignisse ---------- */
+const ACT={
+ 'nav':el=>go(el.dataset.v),
+ 'close-modal':()=>closeModal(),
+ 'seg':el=>{const g=el.parentElement;$$('button',g).forEach(b=>b.setAttribute('aria-pressed',b===el));const h=el.closest('form').querySelector(`input[name="${el.dataset.name}"]`);if(h)h.value=el.dataset.v},
+ 'chip':el=>{el.setAttribute('aria-pressed',el.getAttribute('aria-pressed')!=='true');sumChips(el)},
+ 'foto':el=>openModal('Foto',`<img class="full" data-bid="${el.dataset.id}" src="${blobUrl(el.dataset.id)}" alt="Foto">`,{wide:true}),
+ /* Termine */
+ 'termin-neu':el=>terminForm(el.dataset.kunde?{kundeId:el.dataset.kunde,datum:UI.view==='termine'?UI.terminDatum:today()}:{datum:UI.view==='termine'?UI.terminDatum:today()}),
+ 'termin-open':el=>{const t=S.termine.find(x=>x.id===el.dataset.id);if(t)terminForm(t,t._doc)},
+ 't-day':el=>{UI.terminDatum=el.dataset.v;renderShell()},
+ 't-prev':()=>{UI.terminDatum=addDays(UI.terminDatum,-7);renderShell()},
+ 't-next':()=>{UI.terminDatum=addDays(UI.terminDatum,7);renderShell()},
+ 't-heute':()=>{UI.terminDatum=today();renderShell()},
+ 'termin-del':el=>confirmBox('Termin löschen','Diesen Termin wirklich löschen?','Löschen',()=>mutate('termine/'+el.dataset.doc,d=>{d.list=(d.list||[]).filter(x=>x.id!==el.dataset.id);return d})),
+ 'besuch-aus-termin':el=>{const t=S.termine.find(x=>x.id===el.dataset.id);if(!t)return;if(!t.kundeId){toast('Für diesen Termin gibt es noch keine Kundenkarte – bitte zuerst anlegen.',4000);kundeForm({vorname:t.name||''});return}besuchForm(t.kundeId,{},t)},
+ /* Kunden */
+ 'kunde-neu':()=>kundeForm(),
+ 'kunde-sel':el=>{UI.kundeSel=el.dataset.id;renderBody();if(window.innerWidth<900)window.scrollTo(0,0)},
+ 'kunde-back':()=>{UI.kundeSel=null;renderBody()},
+ 'kunde-edit':el=>kundeForm(kundeById(el.dataset.id)),
+ 'kunde-del':el=>{const k=kundeById(el.dataset.id);confirmBox('Kundenkarte löschen',`Kundenkarte von <b>${esc(kundeName(k))}</b> mit allen Besuchen und Fotos endgültig löschen? Buchungen im Kassenbuch bleiben aus rechtlichen Gründen erhalten.`,'Endgültig löschen',async()=>{
+   const fotos=S.besuche.filter(b=>b.kundeId===k.id).flatMap(b=>b.fotos||[]);
+   await db.doc('kunden/'+k.id).delete();await db.doc('besuche/'+k.id).delete();
+   if(assets)for(const f of fotos){try{await assets.delete(f)}catch(e){}}
+   UI.kundeSel=null;toast('Kundenkarte gelöscht')})},
+ 'besuch-neu':el=>besuchForm(el.dataset.id),
+ 'besuch-edit':el=>{const b=S.besuche.find(x=>x.id===el.dataset.id&&x.kundeId===el.dataset.kunde);if(b)besuchForm(el.dataset.kunde,b)},
+ 'besuch-del':el=>{const b=S.besuche.find(x=>x.id===el.dataset.id);confirmBox('Besuch löschen','Diesen Besuch mit Fotos löschen? Eine zugehörige Kassenbuchung bleibt bestehen.','Löschen',async()=>{
+   await mutate('besuche/'+el.dataset.kunde,d=>{d.list=(d.list||[]).filter(x=>x.id!==el.dataset.id);return d});
+   if(assets&&b)for(const f of b.fotos||[]){try{await assets.delete(f)}catch(e){}}})},
+ 'thumb-del':el=>{pending.keep=pending.keep.filter(x=>x!==el.dataset.id);pending.removed.push(el.dataset.id);renderThumbs()},
+ 'thumb-del-new':el=>{pending.files.splice(Number(el.dataset.i),1);renderThumbs()},
+ 'b-art-add':()=>{const s=$('#b-art');if(!s.value)return;pending.verbrauch.push({id:s.value,menge:1});s.value='';renderVerbrauch()},
+ 'b-art-scan':()=>startScan(code=>{const a=S.artikel.find(x=>String(x.ean||'').trim()===code);if(a){pending.verbrauch.push({id:a.id,menge:1});renderVerbrauch();toast(a.name+' hinzugefügt')}else toast('Barcode '+code+' ist noch keinem Artikel zugeordnet.',4000)}),
+ 'v-del':el=>{pending.verbrauch.splice(Number(el.dataset.i),1);renderVerbrauch()},
+ /* Lager */
+ 'scan-lager':()=>startScan(lookupEan),
+ 'ean-scan':()=>startScan(code=>{$('#f-ean').value=code;const dup=S.artikel.find(x=>String(x.ean||'')===code);toast(dup?'Achtung: Barcode gehört bereits zu „'+dup.name+'“':'Barcode übernommen: '+code,4000)}),
+ 'artikel-neu':()=>artikelForm(),
+ 'scan-full':el=>artikelForm({ean:el.dataset.ean}),
+ 'artikel-open':el=>{const a=S.artikel.find(x=>x.id===el.dataset.id);if(a)artikelAktion(a)},
+ 'artikel-edit':el=>artikelForm(S.artikel.find(x=>x.id===el.dataset.id)),
+ 'artikel-del':el=>confirmBox('Artikel löschen','Artikel aus dem Lager entfernen? Die Bewegungshistorie bleibt erhalten.','Löschen',()=>db.doc('artikel/'+el.dataset.id).delete()),
+ 'quick':async el=>{el.disabled=true;try{await lagerBewegung(el.dataset.id,Number(el.dataset.d),Number(el.dataset.d)>0?'zugang':'verbrauch','')}catch(e){dbFail(e)}el.disabled=false},
+ 'aa':async el=>{const a=S.artikel.find(x=>x.id===el.dataset.id);const m=num($('#aa-menge').value);const notiz=$('#f-aa-notiz').value;const k=el.dataset.k;
+   if(k!=='inventur'&&!(m>0)){toast('Bitte eine Menge größer 0 eingeben.');return}
+   el.disabled=true;
+   try{
+    if(k==='zugang')await lagerBewegung(a.id,m,'zugang',notiz,{mhd:$('#f-aa-mhd').value||''});
+    else if(k==='verbrauch')await lagerBewegung(a.id,-m,'verbrauch',notiz);
+    else if(k==='inventur'){const cur=(await db.doc('artikel/'+a.id).get()).data();await lagerBewegung(a.id,Math.round((m-num(cur&&cur.bestand))*1000)/1000,'inventur',notiz||'Inventurzählung')}
+    else if(k==='verkauf')await lagerBewegung(a.id,-m,'verkauf',notiz||'Verkauf (in Tageseinnahmen enthalten)');
+    toast('Gebucht');const fresh=S.artikel.find(x=>x.id===a.id);closeModal();setTimeout(()=>{const f2=S.artikel.find(x=>x.id===a.id)||fresh;artikelAktion(f2)},250);
+   }catch(e){dbFail(e);el.disabled=false}},
+ 'inventur-csv':()=>{const rows=[['Stichtag',fmtDate(today())],[],['Artikel','Marke','Kategorie','EAN','Bestand','Einheit','EK-Preis','Wert EK']];
+   S.artikel.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).forEach(a=>rows.push([a.name,a.marke,a.kategorie,a.ean,String(num(a.bestand)).replace('.',','),a.einheit,eurPlain(a.ekPreis||0),eurPlain(Math.round(Math.max(0,num(a.bestand))*(a.ekPreis||0)))]));
+   saveFile('Inventur_'+today()+'.csv',toCsv(rows))},
+ /* Kasse */
+ 'kasse-einnahme':()=>{UI.kasseTab='tag';go('kasse')},
+ 'kasse-ausgabe':()=>{UI.kasseTab='aus';UI.lastBooking=null;go('kasse')},
+ 'ausgabe-page':()=>{UI.kasseTab='aus';UI.lastBooking=null;go('kasse')},
+ 'pin-key':el=>{const k=el.dataset.k;UI.pin=k==='⌫'?UI.pin.slice(0,-1):(UI.pin.length<6?UI.pin+k:UI.pin);renderBody()},
+ 'pin-ok':()=>pinOk(),
+ 'lock':()=>{UI.unlocked=false;renderShell()},
+ 'pin-change':()=>confirmBox('PIN ändern','Die aktuelle PIN wird gelöscht. Danach legen Sie eine neue PIN fest.','PIN neu festlegen',async()=>{await mutate('settings/main',d=>({...d,pinHash:''}));UI.unlocked=false}),
+ 'kasse-abschluss':()=>{UI.kasseTab='tag';go('kasse')},
+ 'kasse-tab':el=>{UI.kasseTab=el.dataset.v;UI.lastBooking=null;renderShell()},
+ 'storno':el=>{const k=S.kasse.find(x=>x.nr===el.dataset.nr);confirmBox('Beleg stornieren',`Beleg <b>${esc(k.nr)}</b> (${esc(k.text)}, ${eur(k.betrag)}) stornieren? Es wird eine Gegenbuchung mit neuer Belegnummer erstellt; der Originalbeleg bleibt sichtbar.`,'Stornieren',async()=>{await stornieren(k.nr);toast('Storniert')})},
+ 'quittung':async el=>{const e=S.kasse.find(x=>x.nr===el.dataset.nr);if(!e)return;
+   if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return}
+   if(e.betrag>25000){const k=kundeById(e.kundeId);if(!k||!k.adresse)toast('Hinweis: Über 250 € gehören Name und Anschrift der Kundin auf die Rechnung.',5000)}
+   await saveFile('Quittung_'+e.nr+'.pdf',quittungPDF(e))},
+ 'export-kasse-monat':()=>exportKasse(k=>ymOf(k.datum)===UI.kasseMonat,'Kassenbuch_'+UI.kasseMonat),
+ 'export-kasse-jahr':()=>exportKasse(k=>String(k.datum).startsWith(UI.euerJahr),'Kassenbuch_'+UI.euerJahr),
+ 'backup':()=>{const out={app:'Salon Kassenbuch',exportiert:new Date().toISOString(),settings:S.settings};COLS.forEach(c=>out[c]=(S.raw[c]||[]).map(d=>({id:d.id,data:d.data})));saveFile('Sicherung_'+today()+'.json',JSON.stringify(out,null,1))},
+ 'sicherung':()=>{UI.askBackup=false;sicherungErstellen(false).catch(e=>{console.error(e);toast('Sicherung fehlgeschlagen.')})},
+ 'sicherung-voll':()=>sicherungErstellen(true).catch(e=>{console.error(e);toast('Sicherung fehlgeschlagen.')}),
+ 'monat-pdf':()=>saveFile('Monatsabschluss_'+UI.kasseMonat+'.pdf',monatsPDF(UI.kasseMonat)),
+ 'app-lock':()=>{if(S.settings.appLock&&S.settings.pinHash){UI.appLocked=false;appSperren()}},
+ 'pin-forgot':()=>{UI.pinRecover=true;renderBody()},
+ 'recover-cancel':()=>{UI.pinRecover=false;renderBody()},
+ 'recovery-ok':()=>{UI.showRecovery=null;renderShell()},
+ 'l-add':()=>{$('#l-rows').insertAdjacentHTML('beforeend',leistungRow({name:'',preis:0,dauer:30}))},
+ 'l-del':el=>el.closest('.l-row').remove(),
+ 'w-add':()=>{$('#w-rows').insertAdjacentHTML('beforeend',wkRow({kategorie:'Telefon / Internet',tag:1}))},
+ 'w-del':el=>el.closest('.wk-row').remove(),
+ 'kb-del':el=>{belegFiles.splice(Number(el.dataset.i),1);renderBelegFiles()},
+ 'beleg-add':el=>{if(!assets){toast('Belege können in dieser Ansicht nicht gespeichert werden.');return}belegNachreichen(el.dataset.nr)},
+ 'beleg-show':el=>{const k=S.kasse.find(x=>x.nr===el.dataset.nr);if(!k)return;const L=belegeOf(k);
+   openModal('Beleg '+k.nr,`<div class="small muted">${fmtDate(k.datum)} · ${esc(k.text)} · ${eur(k.betrag)}</div>${L.map(b=>b.typ==='pdf'?`<a class="btn" href="#" data-bid-open="${b.id}">PDF öffnen</a>`:`<img class="full" data-bid="${b.id}" src="${blobUrl(b.id)}" alt="Beleg">`).join('')}<div class="modal-foot"><button class="btn" data-act="beleg-add" data-nr="${k.nr}">+ Seite hinzufügen</button></div>`,{wide:true})},
+ 'wk-buchen':el=>{const w=(S.settings.wiederkehrend||[]).find(x=>x.id===el.dataset.id);if(!w)return;const t=today();const ym=ymOf(t);
+   const last=new Date(Number(ym.slice(0,4)),Number(ym.slice(5)),0).getDate();
+   kasseForm('ausgabe',{betrag:w.betrag,kategorie:w.kategorie,text:w.text+' '+parseDate(ym+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'}),zahlart:'ueberweisung',datum:ym+'-'+pad(Math.min(Number(w.tag)||1,last)),wkId:w.id,wkMonat:ym})}
+};
+function exportKasse(filter,name){
+  const sm=stornoMap();const rows=[['Belegnr','Datum','Erfasst am','Art','Zahlart','Kategorie','Text','Kunde','Betrag','Storno zu','Storniert durch']];
+  S.kasse.filter(filter).forEach(k=>rows.push([k.nr,fmtDate(k.datum),fmtTs(k.ts),k.art==='einnahme'?'Einnahme':'Ausgabe',ZAHLART[k.zahlart],k.kategorie,k.text,k.kundeName||'',eurPlain(sign(k)*k.betrag),k.stornoVon||'',sm[k.nr]||'']));
+  saveFile(name+'.csv',toCsv(rows));
+}
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(!f)return;e.preventDefault();f(el)});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='kunden-suche'){UI.kundenSuche=t.value;renderBody()}
+  else if(t.id==='lager-suche'){UI.lagerSuche=t.value;renderBody()}
+  else if(t.id==='pos-kunde'){UI.pos.kundeText=t.value;const k=kundeFromLabel(t.value);UI.pos.kundeId=k?k.id:'';const m=$('#pos-email');if(k&&k.email&&m&&!m.value){m.value=k.email;UI.pos.email=k.email}}
+  else if(t.id==='f-bar'||t.id==='f-gezaehlt')tagCheck();
+  else if(t.dataset.vi!=null){pending.verbrauch[Number(t.dataset.vi)].menge=num(t.value)}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='t-date'&&t.value){UI.terminDatum=t.value;renderShell()}
+  else if(t.id==='lager-kat'){UI.lagerKat=t.value;renderBody()}
+  else if(t.id==='kasse-monat'){UI.kasseMonat=t.value;renderBody()}
+  else if(t.id==='euer-jahr'){UI.euerJahr=t.value;renderBody()}
+  else if(t.id==='restore-input'&&t.files&&t.files.length){const files=[...t.files];const pw=($('#f-rpw')||{}).value||'';t.value='';confirmBox('Sicherung laden',`${files.length} Datei(en) laden? Die Daten auf diesem iPad werden durch den Stand der neuesten Sicherung <b>ersetzt</b>.`,'Laden und ersetzen',()=>sicherungLaden(files,pw))}
+  else if(t.id==='k-beleg'){const f0=t.files&&t.files[0];const frm=t.closest('form');if(f0&&frm&&frm.dataset.art==='ausgabe'&&!belegFiles.length)belegLesen(f0,frm);const room=4-belegFiles.length;[...t.files].slice(0,Math.max(0,room)).forEach(f=>belegFiles.push(f));if(t.files.length>room)toast('Maximal 4 Seiten pro Beleg.');t.value='';renderBelegFiles()}
+});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#scanner').hidden){scanCb=null;stopScan()}else if(!$('#modal-root').hidden)closeModal()});
+
+/* ---------- Formulare speichern ---------- */
+const FORMS={
+ async settings(f){const v=Object.fromEntries(new FormData(f));const a=parseEur(v.kasseAnfang);
+   await mutate('settings/main',d=>({...d,firma:v.firma.trim(),inhaber:v.inhaber.trim(),adresse:v.adresse.trim(),steuernummer:v.steuernummer.trim(),telefon:v.telefon.trim(),email:v.email.trim(),kasseAnfang:isNaN(a)?0:a,kasseAnfangDatum:v.kasseAnfangDatum,ruhetage:new FormData(f).getAll('ruhetag').map(Number)}));toast('Einstellungen gespeichert')},
+ async wiederkehrend(f){const old=S.settings.wiederkehrend||[];const rows=$$('.wk-row',f).map((r,i)=>({id:(old[i]&&old[i].text===r.querySelector('[name=w-text]').value.trim())?old[i].id:'w'+uid(),text:r.querySelector('[name=w-text]').value.trim(),betrag:parseEur(r.querySelector('[name=w-betrag]').value)||0,kategorie:r.querySelector('[name=w-kat]').value,tag:Math.min(28,Math.max(1,num(r.querySelector('[name=w-tag]').value)||1))})).filter(w=>w.text);
+   await mutate('settings/main',d=>({...d,wiederkehrend:rows}));toast('Abbuchungen gespeichert')},
+ async leistungen(f){const rows=$$('.l-row',f).map((r,i)=>({id:'l'+i+uid().slice(-3),name:r.querySelector('[name=l-name]').value.trim(),preis:parseEur(r.querySelector('[name=l-preis]').value)||0,dauer:num(r.querySelector('[name=l-dauer]').value)||30})).filter(l=>l.name);
+   await mutate('settings/main',d=>({...d,leistungen:rows}));toast('Leistungen gespeichert')},
+ async kunde(f){const v=Object.fromEntries(new FormData(f));if(!v.vorname.trim()&&!v.nachname.trim()){toast('Bitte einen Namen eingeben.');return false}
+   const id=f.dataset.id||uid();const old=kundeById(id)||{};const ein=!!v.fotoEinwilligung;
+   const data={vorname:v.vorname.trim(),nachname:v.nachname.trim(),telefon:v.telefon.trim(),email:v.email.trim(),geburtstag:v.geburtstag,adresse:v.adresse.trim(),notiz:v.notiz.trim(),fotoEinwilligung:ein,einwilligungDatum:ein?(old.einwilligungDatum||today()):'',erstellt:old.erstellt||new Date().toISOString()};
+   await db.doc('kunden/'+id).set(data);UI.kundeSel=id;if(UI.view!=='kunden')go('kunden');toast('Kundenkarte gespeichert')},
+ async termin(f){const v=Object.fromEntries(new FormData(f));const k=kundeFromLabel(v.kunde);
+   if(!v.kunde.trim()){toast('Bitte einen Namen eingeben.');return false}
+   const t={id:f.dataset.id||uid(),kundeId:k?k.id:'',name:k?kundeName(k):v.kunde.trim(),datum:v.datum,zeit:v.zeit,dauer:num(v.dauer)||30,leistung:v.leistung,notiz:v.notiz.trim(),status:v.status||'geplant'};
+   const oldDoc=f.dataset.doc,newDoc=ymOf(t.datum);
+   if(oldDoc&&oldDoc!==newDoc)await mutate('termine/'+oldDoc,d=>{d.list=(d.list||[]).filter(x=>x.id!==t.id);return d});
+   await mutate('termine/'+newDoc,d=>{d.list=(d.list||[]).filter(x=>x.id!==t.id);d.list.push(t);return d});
+   const clash=S.termine.some(x=>x.id!==t.id&&x.datum===t.datum&&x.status!=='abgesagt'&&overlap(x,t));
+   const ruhe=ruhetage().includes(parseDate(t.datum).getDay());
+   toast(clash?'Gespeichert – Achtung: überschneidet sich mit einem anderen Termin.':ruhe?'Gespeichert – Hinweis: '+WD[parseDate(t.datum).getDay()]+' ist Ruhetag.':'Termin gespeichert',clash||ruhe?5000:2600)},
+ async besuch(f){const v=Object.fromEntries(new FormData(f));const kundeId=f.dataset.kunde;const k=kundeById(kundeId);const neu=!f.dataset.id;
+   const leist=$$('#b-chips .chip[aria-pressed="true"]',f).map(c=>({name:c.dataset.name,preis:Number(c.dataset.preis)||0}));
+   const btn=$('#b-save');btn.disabled=true;btn.textContent='Speichert …';
+   const fotos=[...pending.keep];
+   for(const file of pending.files){try{fotos.push(await uploadFoto(file))}catch(e){toast('Ein Foto konnte nicht gespeichert werden.',4000)}}
+   const old=neu?{}:S.besuche.find(x=>x.id===f.dataset.id)||{};
+   const b={id:f.dataset.id||uid(),datum:v.datum,zeit:v.zeit,leistungen:leist.map(l=>l.name),rezeptur:v.rezeptur.trim(),notiz:v.notiz.trim(),fotos,betrag:old.betrag||0,kassenNr:old.kassenNr||''};
+   if(false){const e=await buchen({datum:v.datum,art:'einnahme',zahlart:v.zahlart||'bar',betrag,kategorie:'Dienstleistung',text:(b.leistungen.join(', ')||'Friseurleistung'),kundeId,kundeName:kundeName(k),positionen:leist.filter(l=>l.preis).map(l=>({text:l.name,betrag:l.preis}))});b.kassenNr=e.nr;b._e=e}
+   const e=b._e;delete b._e;
+   await mutate('besuche/'+kundeId,d=>{d.list=(d.list||[]).filter(x=>x.id!==b.id);d.list.push(b);return d});
+   if(assets)for(const id of pending.removed){try{await assets.delete(id)}catch(_){}}
+   for(const vb of pending.verbrauch){if(vb.menge>0)await lagerBewegung(vb.id,-vb.menge,'verbrauch',kundeName(k)+' '+fmtDate(v.datum),{kundeId})}
+   if(f.dataset.termin)await mutate('termine/'+f.dataset.tdoc,d=>{(d.list||[]).forEach(x=>{if(x.id===f.dataset.termin)x.status='erledigt'});return d});
+   if(e){nachBuchung(e);return false}
+   toast('Besuch gespeichert')},
+ async artikel(f){const v=Object.fromEntries(new FormData(f));if(!v.name.trim()){toast('Bitte eine Bezeichnung eingeben.');return false}
+   const ean=v.ean.trim();const dup=ean&&S.artikel.find(x=>x.ean===ean&&x.id!==f.dataset.id);if(dup){toast('Dieser Barcode gehört schon zu „'+dup.name+'“.',4000);return false}
+   const old=S.artikel.find(x=>x.id===f.dataset.id)||{};const nm=v.name.trim();
+   const data={name:nm,marke:v.marke.trim(),ean,kategorie:v.kategorie,einheit:v.einheit.trim()||'Stk',minBestand:num(v.minBestand),ekPreis:parseEur(v.ekPreis)||0,vkPreis:parseEur(v.vkPreis)||0,mhd:v.mhd||'',suche:nm==='Unbekannter Artikel'?(old.suche||(ean?'offen':'')):''};
+   if(f.dataset.id){await db.doc('artikel/'+f.dataset.id).update(data)}
+   else{const id=uid();await db.doc('artikel/'+id).set({...data,bestand:0});const st=num(v.bestand);if(st)await lagerBewegung(id,st,'zugang','Anfangsbestand')}
+   toast('Artikel gespeichert')},
+ async tag(f){const v=Object.fromEntries(new FormData(f));const bar=parseEur(v.bar)||0,karte=parseEur(v.karte)||0,gz=parseEur(v.gezaehlt);const d=v.datum||today();
+   if(bar<0||karte<0){toast('Beträge dürfen nicht negativ sein.');return false}
+   if(!(bar>0)&&!(karte>0)){toast('Bitte Bar- oder Karteneinnahmen eintragen.');return false}
+   const sm=stornoMap();if(S.kasse.some(k=>k.datum===d&&k.tagesEinnahme&&!k.stornoVon&&!sm[k.nr])){toast('Für diesen Tag sind schon Einnahmen eingetragen.');return false}
+   const belege=[];for(const bf of belegFiles){try{belege.push(await uploadBeleg(bf))}catch(e){toast('Ein Foto konnte nicht gespeichert werden.',4000)}}
+   const soll=barbestand()+bar;const txt='Tageseinnahmen '+fmtDate(d)+(v.notiz.trim()?' – '+v.notiz.trim():'');
+   await mutate('kasse/'+ymOf(d),doc=>{doc.entries=doc.entries||[];doc.abschluesse=doc.abschluesse||[];const ts=new Date().toISOString();
+     if(bar>0)doc.entries.push({id:uid(),ts,nr:nextNr(d,doc.entries),datum:d,art:'einnahme',zahlart:'bar',betrag:bar,kategorie:'Tageseinnahmen bar',text:txt,tagesEinnahme:true,belege});
+     if(karte>0)doc.entries.push({id:uid(),ts,nr:nextNr(d,doc.entries),datum:d,art:'einnahme',zahlart:'karte',betrag:karte,kategorie:'Tageseinnahmen Karte (SumUp)',text:txt,tagesEinnahme:true,belege:bar>0?[]:belege});
+     if(!isNaN(gz)){const df=gz-soll;
+       if(df!==0)doc.entries.push({id:uid(),ts,nr:nextNr(d,doc.entries),datum:d,art:df>0?'einnahme':'ausgabe',zahlart:'bar',betrag:Math.abs(df),kategorie:'Kassendifferenz',text:'Kassendifferenz Kassensturz '+fmtDate(d)});
+       doc.abschluesse.push({id:uid(),datum:d,ts,soll,ist:gz,differenz:df})}
+     return doc});
+   UI.posReset=true;renderBody();window.scrollTo(0,0);toast('Tageseinnahmen '+fmtDate(d)+' gespeichert: '+eur(bar+karte),3500);UI.askBackup=true;renderBody();return false},
+ async appsperre(f){const on=f.querySelector('[name=appLock]').checked;if(on&&!S.settings.pinHash){toast('Zuerst eine PIN festlegen.');return false}
+   await mutate('settings/main',d=>({...d,appLock:on}));toast(on?'App-Sperre eingeschaltet':'App-Sperre ausgeschaltet');return false},
+ async backuppw(f){const pw=f.querySelector('[name=pw]').value;if(pw&&pw.length<8){toast('Bitte mindestens 8 Zeichen.');return false}
+   if(pw){await IDB.put('meta','backupPw',pw);UI.hasBackupPw=true;toast('Passwort gespeichert – Sicherungen werden ab jetzt verschlüsselt.',5000)}else{await IDB.del('meta','backupPw');UI.hasBackupPw=false;toast('Passwort entfernt – Sicherungen sind unverschlüsselt.',5000)}
+   f.reset();renderBody();return false},
+ async recover(f){const code=String(f.querySelector('[name=code]').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const fmt=code.slice(0,5)+'-'+code.slice(5);
+   if(S.settings.recoveryHash&&await pinHash('R:'+fmt)===S.settings.recoveryHash){await mutate('settings/main',d=>({...d,pinHash:'',recoveryHash:'',appLock:false}));UI.appLocked=false;UI.pinRecover=false;UI.unlocked=false;toast('Entsperrt. Bitte unter „Mehr“ eine neue PIN festlegen.',6000);UI.view='mehr';renderNav();renderShell()}
+   else toast('Code stimmt nicht.');return false},
+ async scanneu(f){const v=Object.fromEntries(new FormData(f));const nm=v.name.trim();const id=uid();const menge=num(v.menge);
+   await db.doc('artikel/'+id).set({name:nm||'Unbekannter Artikel',marke:'',ean:f.dataset.ean,kategorie:v.kategorie,einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:nm?'':'offen',erfasst:new Date().toISOString()});
+   if(menge>0)await lagerBewegung(id,menge,'zugang','Erfasst per Barcode',{mhd:v.mhd||''});
+   toast(nm?'Artikel gespeichert':'Gespeichert – Name wird gesucht …',3500);if(!nm)setTimeout(offeneSuchen,300)},
+ async kasse(f){const v=Object.fromEntries(new FormData(f));const art=f.dataset.art;const betrag=parseEur(v.betrag);
+   if(!(betrag>0)){toast('Bitte einen gültigen Betrag eingeben, z. B. 35,00.');return false}
+   const leist=$$('#b-chips .chip[aria-pressed="true"]',f).map(c=>({text:c.dataset.name,betrag:Number(c.dataset.preis)||0}));
+   const text=v.text.trim()||leist.map(l=>l.text).join(', ')||(art==='einnahme'?v.kategorie:'');if(!text){toast('Bitte einen Buchungstext eingeben.');return false}
+   const k=v.kunde?kundeFromLabel(v.kunde):null;
+   const belege=[];for(const bf of belegFiles){try{belege.push(await uploadBeleg(bf))}catch(e){toast('Eine Beleg-Seite konnte nicht gespeichert werden.',4000)}}
+   const e=await buchen({datum:v.datum,art,zahlart:v.zahlart,betrag,kategorie:v.kategorie,text,kundeId:k?k.id:'',kundeName:k?kundeName(k):(v.kunde||'').trim(),positionen:leist.filter(l=>l.betrag),belege,wkId:f.dataset.wk||'',wkMonat:f.dataset.wkm||''});
+   if(f.dataset.vendor&&art==='ausgabe')mutate('settings/main',d=>({...d,lieferantKat:{...(d.lieferantKat||{}),[f.dataset.vendor]:v.kategorie}})).catch(()=>{});
+   if(f.dataset.inline){UI.lastBooking=e.nr;UI.posReset=true;renderBody();window.scrollTo(0,0);toast('Gebucht: '+eur(e.betrag));return false}
+   nachBuchung(e);return false},
+ async abschluss(f){const soll=Number(f.dataset.soll);const zaehlung={};let ist=0;
+   DENOMS.forEach(d=>{const n=parseInt(f.querySelector(`[name=d${d}]`).value)||0;if(n){zaehlung[d]=n;ist+=n*d}});
+   const df=ist-soll;const t=today();
+   await mutate('kasse/'+ymOf(t),d=>{d.entries=d.entries||[];d.abschluesse=d.abschluesse||[];
+     if(df!==0)d.entries.push({id:uid(),ts:new Date().toISOString(),nr:nextNr(t,d.entries),datum:t,art:df>0?'einnahme':'ausgabe',zahlart:'bar',betrag:Math.abs(df),kategorie:'Kassendifferenz',text:'Kassendifferenz Tagesabschluss '+fmtDate(t)});
+     d.abschluesse.push({id:uid(),datum:t,ts:new Date().toISOString(),soll,ist,differenz:df,zaehlung});return d});
+   toast(df===0?'Tagesabschluss gespeichert – Kasse stimmt.':'Tagesabschluss gespeichert, Differenz '+eur(df)+' gebucht.',4000)}
+};
+function overlap(a,b){const m=s=>{const [h,mi]=String(s).split(':').map(Number);return h*60+mi};const a0=m(a.zeit),b0=m(b.zeit);return a0<b0+(num(b.dauer)||30)&&b0<a0+(num(a.dauer)||30)}
+document.addEventListener('submit',async e=>{const f=e.target;const h=FORMS[f.dataset.form];if(!h)return;e.preventDefault();
+  if(!db){toast('Speicher nicht verfügbar.');return}
+  const btn=f.querySelector('button:not([type=button])');if(btn)btn.disabled=true;
+  try{const r=await h(f);if(r!==false&&f.closest('#modal-root'))closeModal()}catch(err){dbFail(err)}
+  if(btn&&document.contains(btn)){btn.disabled=false;if(btn.id==='b-save')btn.textContent='Speichern'}
+});
+
+/* ================= Eigenständige App: lokaler Speicher (IndexedDB) ================= */
+const IDB={db:null,
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('seen-salon',1);
+    r.onupgradeneeded=()=>{const d=r.result;['docs','blobs','meta'].forEach(n=>{if(!d.objectStoreNames.contains(n))d.createObjectStore(n)})};
+    r.onsuccess=()=>{this.db=r.result;res()};r.onerror=()=>rej(r.error)})},
+  req(store,mode,fn){return new Promise((res,rej)=>{let t;try{t=this.db.transaction(store,mode)}catch(e){rej(e);return}
+    const rq=fn(t.objectStore(store));let out;if(rq)rq.onsuccess=()=>{out=rq.result};
+    t.oncomplete=()=>res(out);t.onerror=t.onabort=()=>{const e=t.error;rej(e&&e.name==='QuotaExceededError'?{code:'quota_exceeded'}:e)}})},
+  get(s,k){return this.req(s,'readonly',st=>st.get(k))},
+  put(s,k,v){return this.req(s,'readwrite',st=>st.put(v,k))},
+  del(s,k){return this.req(s,'readwrite',st=>st.delete(k))},
+  keys(s){return this.req(s,'readonly',st=>st.getAllKeys())},
+  all(s){return this.req(s,'readonly',st=>st.getAll())},
+  count(s){return this.req(s,'readonly',st=>st.count())}
+};
+const LocalDB={cache:new Map(),colL:new Map(),docL:new Map(),
+  async load(){const ks=await IDB.keys('docs'),vs=await IDB.all('docs');ks.forEach((k,i)=>this.cache.set(k,vs[i]))},
+  snap(path){const d=this.cache.get(path);return {id:path.split('/').pop(),exists:d!==undefined,data:()=>d}},
+  qsnap(col){const docs=[];for(const [p,d] of this.cache){const s=p.split('/');if(s.length===2&&s[0]===col)docs.push({id:s[1],exists:true,data:()=>d})}
+    docs.sort((a,b)=>a.id<b.id?-1:1);return {docs,size:docs.length,empty:!docs.length}},
+  notify(path){const col=path.split('/')[0];(this.colL.get(col)||[]).forEach(f=>f(this.qsnap(col)));(this.docL.get(path)||[]).forEach(f=>f(this.snap(path)))},
+  async write(path,data){const v=clone(data);await IDB.put('docs',path,v);this.cache.set(path,v);this.notify(path)},
+  async remove(path){await IDB.del('docs',path);this.cache.delete(path);this.notify(path)},
+  doc(path){const me=this;return {id:path.split('/').pop(),path,
+    get:async()=>me.snap(path),
+    set:d=>me.write(path,d),
+    update:async d=>{const cur=me.cache.get(path);if(cur===undefined)throw {code:'invalid_argument'};
+      const merge=(a,b)=>{const o={...a};for(const k in b){o[k]=(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&a[k]&&typeof a[k]==='object')?merge(a[k],b[k]):b[k]}return o};
+      await me.write(path,merge(cur,d))},
+    delete:()=>me.remove(path),
+    onSnapshot(fn){const L=me.docL.get(path)||[];L.push(fn);me.docL.set(path,L);fn(me.snap(path));return()=>{}}}},
+  collection(col){const me=this;return {path:col,doc:id=>me.doc(col+'/'+(id||uid())),
+    onSnapshot(fn){const L=me.colL.get(col)||[];L.push(fn);me.colL.set(col,L);fn(me.qsnap(col));return()=>{}}}}
+};
+/* Fotos und Belege als Dateien im Gerät */
+const blobCache=new Map();
+const LocalAssets={
+  async upload(blob,opt={}){const id=uid()+uid();await IDB.put('blobs',id,{blob,type:opt.type||blob.type,ts:Date.now(),size:blob.size});return {id,url:blobUrl(id)}},
+  async delete(id){blobCache.delete(id);await IDB.del('blobs',id);return {deleted:true}},
+  async list(){let est={};try{est=await navigator.storage.estimate()}catch(_){}const n=await IDB.count('blobs');
+    return {assets:[],usage:{files:n,bytes:est.usage||0,maxBytes:est.quota||0,maxFiles:0}}}
+};
+async function blobObjectUrl(id){if(blobCache.has(id))return blobCache.get(id);const r=await IDB.get('blobs',id);if(!r)return '';const u=URL.createObjectURL(r.blob);blobCache.set(id,u);return u}
+function hydrateBlobs(root=document){
+  root.querySelectorAll('[data-bid]').forEach(async el=>{if(el.dataset.bidDone)return;el.dataset.bidDone='1';const u=await blobObjectUrl(el.dataset.bid);if(u)el.src=u;else el.alt='Foto fehlt'});
+}
+new MutationObserver(ms=>{for(const m of ms)m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.dataset&&n.dataset.bid)hydrateBlobs(n.parentNode||document);else if(n.querySelector&&n.querySelector('[data-bid]'))hydrateBlobs(n)}})}).observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('click',async e=>{const a=e.target.closest('[data-bid-open]');if(!a)return;e.preventDefault();const r=await IDB.get('blobs',a.dataset.bidOpen);if(!r){toast('Datei nicht gefunden.');return}
+  await saveFile('Beleg.'+(r.type==='application/pdf'?'pdf':'jpg'),r.blob)},true);
+
+/* Dateien speichern / teilen (iPad: „In Dateien sichern“, OneDrive, Mail …) */
+const MIME={pdf:'application/pdf',csv:'text/csv',json:'application/json',jpg:'image/jpeg',seen:'application/octet-stream'};
+async function saveFile(filename,data){
+  const ext=filename.split('.').pop().toLowerCase();const type=MIME[ext]||'application/octet-stream';
+  const blob=data instanceof Blob?data:new Blob([data],{type});
+  try{const f=new File([blob],filename,{type:blob.type||type});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:filename});return true}}
+  catch(e){if(e&&e.name==='AbortError')return false}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return true;
+}
+
+/* ================= Barcode mit Live-Kamera ================= */
+let scanCb=null,liveScanner=null;
+function startScan(cb){scanCb=cb;const o=$('#scanner');o.hidden=false;$('#scan-manual').value='';$('#scan-msg').textContent='Barcode in den Rahmen halten …';
+  if(!window.Html5Qrcode){$('#scan-msg').textContent='Kamera-Leser nicht geladen. Nummer eintippen oder Foto verwenden.';return}
+  const F=window.Html5QrcodeSupportedFormats;
+  liveScanner=new Html5Qrcode('cam-reader',{verbose:false,formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE]});
+  liveScanner.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>({width:Math.min(320,w*.85),height:Math.min(170,h*.5)})},
+    txt=>{const code=String(txt).trim();if(!code)return;if(navigator.vibrate)navigator.vibrate(60);finishScan(code)},()=>{})
+   .catch(()=>{$('#scan-msg').textContent='Kamera nicht verfügbar. Bitte Kamera-Zugriff erlauben (Einstellungen → Safari/SEEN) – oder Nummer eintippen bzw. Foto verwenden.'});
+}
+async function stopScan(){const s=liveScanner;liveScanner=null;if(s){try{await s.stop()}catch(_){}try{s.clear()}catch(_){}}$('#scanner').hidden=true}
+async function finishScan(code){const cb=scanCb;scanCb=null;await stopScan();if(cb)cb(code)}
+async function decodeBarcode(file){
+  if(!window.Html5Qrcode)return null;const F=window.Html5QrcodeSupportedFormats;
+  const cfg={verbose:false,formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE]};
+  const tries=[];try{const b=await compressImage(file,1400,.92);tries.push(new File([b],'scan.jpg',{type:'image/jpeg'}))}catch(e){}tries.push(file);
+  for(const f of tries){const r=new Html5Qrcode('scan-reader',cfg);try{const res=await r.scanFile(f,false);if(res)return String(res).trim()}catch(e){}finally{try{r.clear()}catch(e){}}}
+  return null;
+}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-scan]');if(!t)return;e.preventDefault();const a=t.dataset.scan;
+  if(a==='cancel'){scanCb=null;stopScan()}
+  else if(a==='manual'){const v=$('#scan-manual').value.replace(/\s/g,'');if(v.length<6){toast('Bitte die Nummer unter dem Barcode eingeben.');return}finishScan(v)}
+  else if(a==='photo'){const i=$('#scan-input');i.value='';i.click()}});
+$('#scan-input').addEventListener('change',async ev=>{const f=ev.target.files&&ev.target.files[0];if(!f)return;$('#scan-msg').textContent='Foto wird gelesen …';
+  const code=await decodeBarcode(f);if(code)finishScan(code);else $('#scan-msg').textContent='Kein Barcode erkannt. Näher heran und gut ausleuchten – oder Nummer eintippen.'});
+
+/* ================= Produktdaten zum Barcode (Open Beauty/Food/Products Facts) ================= */
+async function produktSuchen(ean){
+  const hosts=['world.openbeautyfacts.org','world.openproductsfacts.org','world.openfoodfacts.org'];
+  for(const h of hosts){try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
+    const r=await fetch(`https://${h}/api/v2/product/${encodeURIComponent(ean)}.json?fields=product_name,product_name_de,brands,quantity`,{signal:ctl.signal});clearTimeout(to);
+    if(!r.ok)continue;const j=await r.json();const p=j&&j.product;const name=p&&(p.product_name_de||p.product_name);
+    if(j.status===1&&name)return {name:String(name).trim(),marke:String(p.brands||'').split(',')[0].trim(),info:p.quantity?('Inhalt: '+p.quantity):'',quelle:h}}catch(_){}}
+  return null;
+}
+let suchLaeuft=false;
+async function offeneSuchen(){
+  if(suchLaeuft||!navigator.onLine)return;suchLaeuft=true;
+  try{for(const a of S.artikel.filter(x=>x.suche==='offen'&&x.ean)){
+    const p=await produktSuchen(a.ean);
+    if(p)await db.doc('artikel/'+a.id).update({name:a.name==='Unbekannter Artikel'?p.name:a.name,marke:a.marke||p.marke,info:p.info,quelle:p.quelle,suche:''});
+    else await db.doc('artikel/'+a.id).update({suche:'nicht_gefunden'});
+  }}catch(e){console.warn(e)}finally{suchLaeuft=false}
+}
+window.addEventListener('online',()=>offeneSuchen());
+
+/* ================= Rechnung fotografieren & auslesen (Texterkennung) ================= */
+let tessLoad=null;
+function ladeTesseract(){if(window.Tesseract)return Promise.resolve();if(tessLoad)return tessLoad;
+  tessLoad=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>{tessLoad=null;rej(new Error('offline'))};document.head.appendChild(s)});return tessLoad}
+const lieferKey=s=>String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]/g,'').slice(0,24);
+function belegAuswerten(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const amt=/(\d{1,3}(?:[.\s]\d{3})*|\d+)[,.](\d{2})(?!\d)/g;
+  const val=s=>Math.round(Number(s.replace(/[.\s](?=\d{3}\b)/g,'').replace(/\s/g,'').replace(',','.'))*100);
+  const kw=/(zu zahlen|gesamtbetrag|endbetrag|rechnungsbetrag|gesamt|summe|total|betrag)/i;
+  let best=0;
+  lines.forEach(l=>{if(!kw.test(l))return;const m=[...l.matchAll(amt)];if(m.length){const v=val(m[m.length-1][0]);if(v>best)best=v}});
+  if(!best){lines.forEach(l=>{[...l.matchAll(amt)].forEach(m=>{const v=val(m[0]);if(v>best&&v<10000000)best=v})})}
+  let datum='';const dm=text.match(/\b(\d{1,2})[.\/-](\d{1,2})[.\/-](20\d{2}|\d{2})\b/);
+  if(dm){const y=dm[3].length===2?'20'+dm[3]:dm[3];const mo=Number(dm[2]),d=Number(dm[1]);if(mo>=1&&mo<=12&&d>=1&&d<=31)datum=`${y}-${pad(mo)}-${pad(d)}`}
+  const firma=(lines.find(l=>/[A-Za-zÄÖÜäöü]{3,}/.test(l)&&!/rechnung|quittung|beleg|kassenbon|datum|seite/i.test(l))||'').replace(/[^\wÄÖÜäöüß&.,\- ]/g,'').trim().slice(0,60);
+  return {betrag:best,datum,firma};
+}
+async function belegLesen(file,form){
+  const st=$('#ocr-status',form);const set=t=>{if(st)st.textContent=t};
+  if(/pdf/.test(file.type)){set('PDF: Betrag bitte selbst eintragen.');return}
+  set('Rechnung wird gelesen … (beim ersten Mal wird die Texterkennung geladen)');
+  try{await ladeTesseract();
+    const w=await Tesseract.createWorker('deu');const img=await compressImage(file,2200,.92);
+    const {data}=await w.recognize(img);await w.terminate();
+    const r=belegAuswerten(data.text||'');let n=0;
+    const b=form.querySelector('[name=betrag]');if(r.betrag&&b&&!b.value){b.value=eurPlain(r.betrag);n++}
+    const d=form.querySelector('[name=datum]');if(r.datum&&d){d.value=r.datum;n++}
+    const t=form.querySelector('[name=text]');if(r.firma&&t&&!t.value){t.value=r.firma;n++}
+    if(r.firma){form.dataset.vendor=lieferKey(r.firma);const kat=(S.settings.lieferantKat||{})[form.dataset.vendor];const ks=form.querySelector('[name=kategorie]');if(kat&&ks)ks.value=kat}
+    set(n?'Erkannt – bitte Betrag, Datum und Text prüfen.':'Nichts sicher erkannt – bitte selbst eintragen.');
+  }catch(e){console.warn(e);set(navigator.onLine?'Texterkennung fehlgeschlagen – bitte selbst eintragen.':'Ohne Internet keine Texterkennung beim ersten Mal – bitte selbst eintragen.')}
+}
+
+/* ================= Datensicherung (täglich, verschlüsselbar) ================= */
+const b64=buf=>{let s='';const a=new Uint8Array(buf);for(let i=0;i<a.length;i+=32768)s+=String.fromCharCode.apply(null,a.subarray(i,i+32768));return btoa(s)};
+const unb64=s=>{const bin=atob(s);const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a};
+async function aesKey(pw,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function sicherungErstellen(alleFotos){
+  const last=alleFotos?0:(await IDB.get('meta','lastBackupTs'))||0;const now=Date.now();
+  const docs=[...LocalDB.cache].map(([path,data])=>({path,data}));
+  const keys=await IDB.keys('blobs');const blobs=[];
+  for(const id of keys){const r=await IDB.get('blobs',id);if(!r||r.ts<=last)continue;blobs.push({id,type:r.type,ts:r.ts,data:b64(await r.blob.arrayBuffer())})}
+  let out={app:'SEEN Salon',v:1,erstellt:new Date(now).toISOString(),fotosAb:last,vollstaendig:!!alleFotos||!last,docs,blobs};
+  let json=JSON.stringify(out);const pw=await IDB.get('meta','backupPw');
+  if(pw){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},await aesKey(pw,salt),new TextEncoder().encode(json));
+    json=JSON.stringify({app:'SEEN Salon',v:1,verschluesselt:true,erstellt:out.erstellt,salt:b64(salt),iv:b64(iv),data:b64(ct)})}
+  const name='SEEN-Sicherung_'+today()+'_'+pad(new Date().getHours())+pad(new Date().getMinutes())+'.json';
+  const ok=await saveFile(name,new Blob([json],{type:'application/json'}));
+  if(ok){await IDB.put('meta','lastBackupTs',now);UI.lastBackup=now;toast(`Sicherung erstellt (${blobs.length} neue Fotos). Bitte in OneDrive → Salon-Sicherung ablegen.`,6000);scheduleRender()}
+}
+async function sicherungLesen(file,pw){
+  let j=JSON.parse(await file.text());
+  if(j.verschluesselt){if(!pw)throw new Error('pw');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(j.iv)},await aesKey(pw,unb64(j.salt)),unb64(j.data));j=JSON.parse(new TextDecoder().decode(pt))}
+  if(j.app!=='SEEN Salon'||!Array.isArray(j.docs))throw new Error('format');return j;
+}
+async function sicherungLaden(files,pw){
+  const list=[];for(const f of files){try{list.push(await sicherungLesen(f,pw))}catch(e){toast(e.message==='pw'?'Diese Sicherung ist verschlüsselt – bitte Passwort eingeben.':e.name==='OperationError'?'Falsches Passwort.':'„'+f.name+'“ ist keine gültige SEEN-Sicherung.',6000);return}}
+  list.sort((a,b)=>a.erstellt<b.erstellt?-1:1);const neueste=list[list.length-1];
+  for(const s of list)for(const b of s.blobs||[])await IDB.put('blobs',b.id,{blob:new Blob([unb64(b.data)],{type:b.type}),type:b.type,ts:b.ts,size:b.data.length*.75});
+  for(const k of await IDB.keys('docs'))await IDB.del('docs',k);
+  for(const d of neueste.docs)await IDB.put('docs',d.path,d.data);
+  await IDB.put('meta','lastBackupTs',Date.now());
+  toast('Sicherung geladen – App startet neu.',3000);setTimeout(()=>location.reload(),1200);
+}
+function sicherungCard(){
+  const lb=UI.lastBackup;const tage=lb?Math.floor((Date.now()-lb)/864e5):null;
+  return `<div class="card grid" style="gap:12px"><h3 style="margin:0">Datensicherung</h3>
+   <p class="small muted" style="margin:0">Alle Daten liegen nur auf diesem iPad. Jeden Abend sichern: Die Datei enthält alle Daten und die neuen Fotos seit der letzten Sicherung. Im iPad-Fenster „In Dateien sichern“ → <b>OneDrive → Salon-Sicherung</b> wählen.</p>
+   <div class="small">Letzte Sicherung: <b>${lb?fmtTs(lb):'noch nie'}</b>${tage!=null&&tage>=2?' <span class="pill warn">vor '+tage+' Tagen</span>':''}</div>
+   <div class="actions"><button class="btn primary" data-act="sicherung">Sicherung jetzt erstellen</button><button class="btn" data-act="sicherung-voll">Komplett mit allen Fotos</button><button class="btn" data-act="export-kasse-jahr">Kassenbuch ${UI.euerJahr} (CSV)</button></div>
+   <form data-form="backuppw" class="fields" style="align-items:end"><div class="field"><label for="f-bpw">Passwort für Sicherungen (empfohlen)</label><input id="f-bpw" name="pw" type="password" autocomplete="new-password" placeholder="${UI.hasBackupPw?'••••••• (gesetzt – neues eingeben zum Ändern)':'mind. 8 Zeichen'}"></div><button class="btn">Passwort speichern</button></form>
+   <p class="small muted" style="margin:0">Mit Passwort ist die Sicherung verschlüsselt: Ohne das Passwort kann niemand die Datei öffnen – auch Sie nicht. Passwort auf Papier notieren und zu Hause aufbewahren.</p>
+   <div class="field"><span class="label">Sicherung wiederherstellen</span><p class="small muted" style="margin:0">Bei einem neuen iPad: zuerst die letzte <b>komplette</b> Sicherung und alle späteren Tagessicherungen gemeinsam auswählen.</p>
+    <div class="fields" style="align-items:end"><div class="field"><label for="f-rpw">Passwort (falls verschlüsselt)</label><input id="f-rpw" type="password" autocomplete="off"></div><label class="btn">Sicherungsdateien wählen<input type="file" id="restore-input" accept=".json,application/json" multiple hidden></label></div></div></div>`;
+}
+
+/* ================= App-Sperre mit PIN ================= */
+let lastActive=Date.now();
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastActive=Date.now()},true));
+function appSperren(){if(!S.settings.appLock||!S.settings.pinHash||UI.appLocked)return;UI.appLocked=true;UI.pin='';stopScan();if(!$('#modal-root').hidden)hideModal();renderNav();renderShell()}
+setInterval(()=>{if(Date.now()-lastActive>5*60000)appSperren()},20000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')lastActive=Math.min(lastActive,Date.now());else if(Date.now()-lastActive>5*60000)appSperren()});
+const recoveryCode=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const a=crypto.getRandomValues(new Uint8Array(10));return [...a].map(x=>c[x%c.length]).join('').replace(/(.{5})/,'$1-')};
+
+/* ================= Monatsabschluss als PDF ================= */
+function monatsPDF(ym){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});const s=S.settings;let y=18;const x=16,W=210;
+  const sm=stornoMap();const L=S.kasse.filter(k=>ymOf(k.datum)===ym);const jahr=ym.slice(0,4);
+  const agg=(list,art)=>{const m={};list.filter(k=>k.art===art&&!isPrivat(k)).forEach(k=>{m[k.kategorie]=(m[k.kategorie]||0)+k.betrag});return m};
+  const sum=o=>Object.values(o).reduce((a,b)=>a+b,0);
+  const E=agg(L,'einnahme'),A=agg(L,'ausgabe');const YL=S.kasse.filter(k=>k.datum.slice(0,4)===jahr&&k.datum.slice(0,7)<=ym);
+  const YE=sum(agg(YL,'einnahme')),YA=sum(agg(YL,'ausgabe'));
+  const umsatz=sum(agg(YL,'einnahme'))-(agg(YL,'einnahme')['Kassendifferenz']||0);
+  const line=(t,v,b)=>{if(y>275){doc.addPage();y=18}doc.setFont('helvetica',b?'bold':'normal');doc.text(String(t),x,y);if(v!=null)doc.text(String(v),W-x,y,{align:'right'});y+=6};
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Monatsabschluss '+parseDate(ym+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'}),x,y);y+=7;
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text([s.firma||'SEEN Salon',s.adresse||'',s.steuernummer?'Steuernummer '+s.steuernummer:''].filter(Boolean).join(' · ')+' · erstellt '+fmtTs(Date.now()),x,y);y+=10;doc.setFontSize(10.5);
+  line('Betriebseinnahmen',eur(sum(E)),true);Object.entries(E).forEach(([k,v])=>line('   '+k,eur(v)));
+  line('Betriebsausgaben',eur(sum(A)),true);Object.entries(A).forEach(([k,v])=>line('   '+k,eur(v)));
+  y+=2;line((sum(E)-sum(A)<0?'Verlust':'Gewinn')+' im Monat',eur(sum(E)-sum(A)),true);
+  line('Seit Jahresbeginn: Einnahmen / Ausgaben',eur(YE)+' / '+eur(YA));line('Seit Jahresbeginn: '+(YE-YA<0?'Verlust':'Gewinn'),eur(YE-YA),true);
+  line('Kleinunternehmergrenze (25.000 € / 100.000 €)',eur(umsatz)+' Umsatz '+jahr);
+  line('Barbestand laut Buch (heute)',eur(barbestand()));
+  const tage=[...new Set(L.filter(k=>k.tagesEinnahme).map(k=>k.datum))];const sturz=new Set(S.abschluesse.filter(a=>ymOf(a.datum)===ym).map(a=>a.datum));
+  const ohne=tage.filter(t=>!sturz.has(t));line('Tage mit Einnahmen / ohne Kassensturz',tage.length+' / '+ohne.length+(ohne.length?' ('+ohne.map(fmtDate).join(', ')+')':''));
+  const low=lowStock();if(low.length)line('Nachbestellen: '+low.map(a=>a.name).join(', ').slice(0,90));
+  y+=4;line('Buchungen',null,true);doc.setFontSize(9);
+  L.slice().sort((a,b)=>a.nr<b.nr?-1:1).forEach(k=>line(`${k.nr}  ${fmtDate(k.datum)}  ${ZAHLART[k.zahlart]||''}  ${String(k.text).slice(0,60)}${sm[k.nr]?' (storniert)':''}`,(k.art==='einnahme'?'':'− ')+eur(Math.abs(k.betrag))));
+  if(!L.length)line('Keine Buchungen in diesem Monat.');
+  return doc.output('blob');
+}
+
+init();
+</script>
+</body></html>
