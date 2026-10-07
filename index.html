@@ -1287,9 +1287,11 @@ async function offeneSuchen(){
 window.addEventListener('online',()=>offeneSuchen());
 
 /* ================= Rechnung fotografieren & auslesen (Texterkennung) ================= */
-let tessLoad=null;
-function ladeTesseract(){if(window.Tesseract)return Promise.resolve();if(tessLoad)return tessLoad;
-  tessLoad=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>{tessLoad=null;rej(new Error('offline'))};document.head.appendChild(s)});return tessLoad}
+let ocrW=null;
+function ocrText(blob,onStatus){return new Promise(async(res,rej)=>{
+  if(!ocrW)ocrW=new Worker('ocr/ocr-worker.js');const buf=await blob.arrayBuffer();
+  ocrW.onmessage=e=>{const d=e.data;if(d.status){onStatus&&onStatus(d.status);return}d.ok?res(d.text):rej(new Error(d.err))};
+  ocrW.onerror=e=>{ocrW=null;rej(new Error(e.message||'Worker-Fehler'))};ocrW.postMessage(buf,[buf])})}
 const lieferKey=s=>String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]/g,'').slice(0,24);
 function belegAuswerten(text){
   const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -1307,17 +1309,16 @@ function belegAuswerten(text){
 async function belegLesen(file,form){
   const st=$('#ocr-status',form);const set=t=>{if(st)st.textContent=t};
   if(/pdf/.test(file.type)){set('PDF: Betrag bitte selbst eintragen.');return}
-  set('Rechnung wird gelesen … (beim ersten Mal wird die Texterkennung geladen)');
-  try{await ladeTesseract();
-    const w=await Tesseract.createWorker('deu');const img=await compressImage(file,2200,.92);
-    const {data}=await w.recognize(img);await w.terminate();
-    const r=belegAuswerten(data.text||'');let n=0;
+  set('Rechnung wird gelesen …');
+  try{const img=await compressImage(file,2000,.92);
+    const text=await ocrText(img,st=>set(st==='laden'?'Texterkennung wird gestartet … (beim allerersten Mal ca. 5 MB laden)':'Rechnung wird gelesen …'));
+    const r=belegAuswerten(text||'');let n=0;
     const b=form.querySelector('[name=betrag]');if(r.betrag&&b&&!b.value){b.value=eurPlain(r.betrag);n++}
     const d=form.querySelector('[name=datum]');if(r.datum&&d){d.value=r.datum;n++}
     const t=form.querySelector('[name=text]');if(r.firma&&t&&!t.value){t.value=r.firma;n++}
     if(r.firma){form.dataset.vendor=lieferKey(r.firma);const kat=(S.settings.lieferantKat||{})[form.dataset.vendor];const ks=form.querySelector('[name=kategorie]');if(kat&&ks)ks.value=kat}
     set(n?'Erkannt – bitte Betrag, Datum und Text prüfen.':'Nichts sicher erkannt – bitte selbst eintragen.');
-  }catch(e){console.warn(e);set(navigator.onLine?'Texterkennung fehlgeschlagen – bitte selbst eintragen.':'Ohne Internet keine Texterkennung beim ersten Mal – bitte selbst eintragen.')}
+  }catch(e){console.warn(e);set('Texterkennung nicht möglich ('+(e&&e.message||'Fehler')+') – bitte selbst eintragen.')}
 }
 
 /* ================= Datensicherung (täglich, verschlüsselbar) ================= */
