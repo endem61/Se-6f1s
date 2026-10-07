@@ -217,6 +217,7 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 <nav class="tabs" aria-label="Bereiche"><div class="in" id="nav"></div></nav>
 <div id="scan-reader"></div>
 <input type="file" id="scan-input" accept="image/*" capture="environment" hidden>
+<input type="file" id="art-foto-input" accept="image/*" capture="environment" hidden>
 <input type="file" id="beleg-input" accept="image/*,application/pdf" multiple hidden>
 <div class="toast" id="toast" hidden></div>
 <div id="scanner" hidden role="dialog" aria-label="Barcode scannen"><div class="box">
@@ -482,7 +483,7 @@ lager:()=>loadingOr(()=>{if(UI.serie)return serieView();
   const wert=S.artikel.reduce((s,a)=>s+Math.max(0,num(a.bestand))*(Number(a.ekPreis)||0),0);
   return `<div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Artikel</span><b>${S.artikel.length}</b></div><div class="card stat"><span class="label">Lagerwert (EK)</span><b>${eur(Math.round(wert))}</b></div><div class="card stat"><span class="label">Unter Mindestbestand</span><b>${lowStock().length}</b></div></div>
   <div class="card" style="padding:6px 10px">${list.length?`<div class="list">${list.map(a=>{const low=num(a.minBestand)>0&&num(a.bestand)<=num(a.minBestand);
-   return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="" data-act="artikel-open" data-id="${a.id}">`:`<div class="pthumb ph" data-act="artikel-open" data-id="${a.id}" aria-hidden="true">${esc((a.name||"?").slice(0,1))}</div>`}<div class="grow click" data-act="artikel-open" data-id="${a.id}" style="cursor:pointer"><div class="title">${esc(a.name)}</div><div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div></div>
+   return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="" data-act="artikel-open" data-id="${a.id}">`:`<button type="button" class="pthumb ph" data-act="art-foto" data-id="${a.id}" aria-label="Produktfoto aufnehmen" style="font-size:20px">📷</button>`}<div class="grow click" data-act="artikel-open" data-id="${a.id}" style="cursor:pointer"><div class="title">${esc(a.name)}</div><div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div></div>
    ${artikelPills(a)}${low?'<span class="pill bad">nachbestellen</span>':''}<span class="stock ${low?'minus':''}">${fmtM(num(a.bestand))}</span>
    <div class="stepper"><button data-act="quick" data-id="${a.id}" data-d="-1" aria-label="Einen entnehmen">−</button><button data-act="quick" data-id="${a.id}" data-d="1" aria-label="Einen hinzufügen">+</button></div></div>`}).join('')}</div>`:`<div class="empty">${S.artikel.length?'Keine Treffer.':'Noch keine Artikel. Barcode einer Farbtube scannen oder „+ Artikel“ tippen.'}</div>`}</div>`;
 }),
@@ -763,7 +764,7 @@ function artikelAktion(a){
    ${a.suche==='offen'?'<div class="notice info">Name und Hersteller werden gerade automatisch gesucht.</div>':a.suche==='nicht_gefunden'?'<div class="notice">Für diesen Barcode wurde im Internet nichts gefunden. Bitte über „Bearbeiten“ selbst eintragen.</div>':''}
    ${a.info?`<div class="small muted">${esc(a.info)}</div>`:''}${a.mhd?`<div class="small">Haltbar bis: <b>${fmtDate(a.mhd)}</b></div>`:''}
    <div class="fields" style="align-items:end"><div class="field"><label for="aa-menge">Menge</label><input id="aa-menge" type="number" min="0" step="any" value="1"></div>${fld('aa-notiz','Notiz (z. B. Lieferant, Rechnung)','')}${fld('aa-mhd','Haltbar bis (bei Eingang, optional)','','date')}</div>
-   <div class="actions"><button class="btn ok" data-act="aa" data-k="zugang" data-id="${a.id}">+ Eingang</button><button class="btn" data-act="aa" data-k="verbrauch" data-id="${a.id}">− Verbrauch</button><button class="btn" data-act="aa" data-k="verkauf" data-id="${a.id}">− Verkauft</button><button class="btn" data-act="aa" data-k="inventur" data-id="${a.id}">Inventur: Bestand = Menge</button><button class="btn" data-act="artikel-edit" data-id="${a.id}" style="margin-left:auto">Bearbeiten</button></div>
+   <div class="actions"><button class="btn ok" data-act="aa" data-k="zugang" data-id="${a.id}">+ Eingang</button><button class="btn" data-act="aa" data-k="verbrauch" data-id="${a.id}">− Verbrauch</button><button class="btn" data-act="aa" data-k="verkauf" data-id="${a.id}">− Verkauft</button><button class="btn" data-act="aa" data-k="inventur" data-id="${a.id}">Inventur: Bestand = Menge</button><button class="btn" data-act="art-foto" data-id="${a.id}" style="margin-left:auto">${a.foto?'Foto ersetzen':'📷 Foto aufnehmen'}</button><button class="btn" data-act="artikel-edit" data-id="${a.id}">Bearbeiten</button></div>
    <div><div class="label" style="margin-bottom:4px">Letzte Bewegungen</div>${hist.length?`<div class="table-wrap"><table><tbody>${hist.map(h=>`<tr><td class="small">${fmtTs(h.ts)}</td><td>${ARTL[h.art]||h.art}${h.notiz?' <span class="small muted">'+esc(h.notiz)+'</span>':''}</td><td class="num ${h.menge<0?'minus':'plus'}">${h.menge>0?'+':''}${h.menge}</td><td class="num muted">→ ${h.bestandNach}</td></tr>`).join('')}</tbody></table></div>`:'<div class="small muted">Noch keine Bewegungen.</div>'}</div>`,{wide:true});
 }
 function lookupEan(code){
@@ -968,6 +969,7 @@ const ACT={
  'v-del':el=>{pending.verbrauch.splice(Number(el.dataset.i),1);renderVerbrauch()},
  /* Lager */
  'scan-lager':()=>startScan(lookupEan),
+ 'art-foto':el=>{artFotoZiel=el.dataset.id;const i=$('#art-foto-input');i.value='';i.click()},
  'serie-start':el=>serieStart(el.dataset.k,el.dataset.beleg),
  'serie-scan':()=>startScan(serieScan,true),
  'serie-d':el=>{serieAdd(el.dataset.id,Number(el.dataset.d));renderBody()},
@@ -1291,6 +1293,10 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-scan]');if
 $('#scan-input').addEventListener('change',async ev=>{const f=ev.target.files&&ev.target.files[0];if(!f)return;$('#scan-msg').textContent='Foto wird gelesen …';
   const code=await decodeBarcode(f);if(code)finishScan(code);else $('#scan-msg').textContent='Kein Barcode erkannt. Näher heran und gut ausleuchten – oder Nummer eintippen.'});
 
+let artFotoZiel=null;
+$('#art-foto-input').addEventListener('change',async ev=>{const f=ev.target.files&&ev.target.files[0];const id=artFotoZiel;artFotoZiel=null;if(!f||!id)return;
+  try{toast('Foto wird gespeichert …');const old=(S.artikel.find(x=>x.id===id)||{}).foto;const fid=await produktFoto(f);await db.doc('artikel/'+id).update({foto:fid});if(old)assets.delete(old).catch(()=>{});
+    toast('Produktfoto gespeichert');if(!$('#modal-root').hidden){const a=S.artikel.find(x=>x.id===id);if(a)artikelAktion({...a,foto:fid})}else renderBody()}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}});
 /* ================= Serien-Scan: Wareneingang / Verbrauch ================= */
 function serieStart(mode,beleg){UI.serie={mode,beleg:beleg||'',items:[]};UI.lastBooking=null;go('lager')}
 function serieAdd(id,d=1){const it=UI.serie.items.find(x=>x.id===id);if(it)it.menge=Math.max(0,Math.round((it.menge+d)*1000)/1000);else if(d>0)UI.serie.items.unshift({id,menge:d})}
@@ -1309,7 +1315,7 @@ function serieView(){const z=UI.serie,ein=z.mode==='zugang';const items=z.items.
    <p class="small muted" style="margin:0">${ein?'Gelieferte Produkte nacheinander scannen – jedes Scannen zählt 1 Stück. Die Mengen lassen sich unten mit − / + korrigieren. Erst mit „Ins Lager buchen“ wird der Bestand erhöht.':'Verbrauchte Produkte (z. B. leere Farbtuben) scannen – jedes Scannen zählt 1 Stück. Mit „Vom Lager abbuchen“ wird der Bestand verringert.'}</p>
    <div class="actions"><button class="btn primary" data-act="serie-scan">${items.length?'Weiter scannen':'Scannen starten'}</button></div>
    <div class="fields" style="align-items:end"><div class="field"><label for="serie-art">Artikel ohne Barcode hinzufügen</label><select id="serie-art"><option value="">– Artikel wählen –</option>${opts.map(a=>`<option value="${a.id}">${esc(a.name)}${a.marke?' · '+esc(a.marke):''}</option>`).join('')}</select></div><button class="btn" data-act="serie-pick">Hinzufügen</button></div>
-   ${items.length?`<div class="list">${items.map(x=>{const a=S.artikel.find(y=>y.id===x.id)||{name:'…'};return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="">`:`<div class="pthumb ph" aria-hidden="true">${esc((a.name||'?').slice(0,1))}</div>`}<div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">Bestand jetzt ${num(a.bestand)} → danach <b>${Math.round((num(a.bestand)+(ein?1:-1)*x.menge)*1000)/1000}</b></div></div>
+   ${items.length?`<div class="list">${items.map(x=>{const a=S.artikel.find(y=>y.id===x.id)||{name:'…'};return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="">`:`<button type="button" class="pthumb ph" data-act="art-foto" data-id="${x.id}" aria-label="Produktfoto aufnehmen" style="font-size:20px">📷</button>`}<div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">Bestand jetzt ${num(a.bestand)} → danach <b>${Math.round((num(a.bestand)+(ein?1:-1)*x.menge)*1000)/1000}</b></div></div>
      <div class="stepper"><button data-act="serie-d" data-id="${x.id}" data-d="-1" aria-label="Eins weniger">−</button><span class="stock" style="min-width:2.4em;text-align:center">${x.menge}</span><button data-act="serie-d" data-id="${x.id}" data-d="1" aria-label="Eins mehr">+</button></div></div>`}).join('')}</div>`:'<div class="empty" style="padding:14px">Noch nichts erfasst.</div>'}
    <div class="modal-foot"><button class="btn" data-act="serie-abbruch" style="margin-right:auto">Abbrechen</button><button class="btn ${ein?'ok':'primary'}" data-act="serie-buchen" ${items.some(x=>x.menge>0)?'':'disabled'}>${ein?'Ins Lager buchen':'Vom Lager abbuchen'}</button></div></div>`}
 async function serieBuchen(){const z=UI.serie;const ein=z.mode==='zugang';let n=0;

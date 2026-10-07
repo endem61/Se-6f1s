@@ -1,5 +1,5 @@
 /* SEEN Salon – Offline-Speicher der App-Dateien (keine Kundendaten) */
-const VERSION = 'seen-2026-10-08j';
+const VERSION = 'seen-2026-10-08k';
 const CORE = ['./', './index.html', './manifest.webmanifest', './lib/html5-qrcode.min.js', './lib/jspdf.umd.min.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net', 'unpkg.com'];
