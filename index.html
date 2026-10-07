@@ -192,6 +192,9 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 #scanner .box{background:var(--surface);border-radius:16px;width:min(560px,100%);padding:16px;display:grid;gap:12px}
 #cam-reader{width:100%;min-height:240px;border-radius:12px;overflow:hidden;background:#000}
 #cam-reader video{width:100%!important;height:auto!important;border-radius:12px}
+.pthumb{width:52px;height:52px;border-radius:10px;object-fit:cover;border:1px solid var(--line);background:var(--surface2);flex:none;cursor:pointer}
+.pthumb.ph{display:grid;place-items:center;font:600 1.3rem var(--f-display);color:var(--muted)}
+.pthumb.big{width:110px;height:110px}
 .lockbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;font-weight:600;cursor:pointer}
 </style>
 </head><body>
@@ -468,7 +471,7 @@ lager:()=>loadingOr(()=>{
   const wert=S.artikel.reduce((s,a)=>s+Math.max(0,num(a.bestand))*(Number(a.ekPreis)||0),0);
   return `<div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Artikel</span><b>${S.artikel.length}</b></div><div class="card stat"><span class="label">Lagerwert (EK)</span><b>${eur(Math.round(wert))}</b></div><div class="card stat"><span class="label">Unter Mindestbestand</span><b>${lowStock().length}</b></div></div>
   <div class="card" style="padding:6px 10px">${list.length?`<div class="list">${list.map(a=>{const low=num(a.minBestand)>0&&num(a.bestand)<=num(a.minBestand);
-   return `<div class="row"><div class="grow click" data-act="artikel-open" data-id="${a.id}" style="cursor:pointer"><div class="title">${esc(a.name)}</div><div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div></div>
+   return `<div class="row">${a.foto?`<img class="pthumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="" data-act="artikel-open" data-id="${a.id}">`:`<div class="pthumb ph" data-act="artikel-open" data-id="${a.id}" aria-hidden="true">${esc((a.name||"?").slice(0,1))}</div>`}<div class="grow click" data-act="artikel-open" data-id="${a.id}" style="cursor:pointer"><div class="title">${esc(a.name)}</div><div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div></div>
    ${artikelPills(a)}${low?'<span class="pill bad">nachbestellen</span>':''}<span class="stock ${low?'minus':''}">${num(a.bestand)}</span>
    <div class="stepper"><button data-act="quick" data-id="${a.id}" data-d="-1" aria-label="Einen entnehmen">−</button><button data-act="quick" data-id="${a.id}" data-d="1" aria-label="Einen hinzufügen">+</button></div></div>`}).join('')}</div>`:`<div class="empty">${S.artikel.length?'Keine Treffer.':'Noch keine Artikel. Barcode einer Farbtube scannen oder „+ Artikel“ tippen.'}</div>`}</div>`;
 }),
@@ -649,18 +652,20 @@ function renderVerbrauch(){const box=$('#b-verbrauch');if(!box)return;box.innerH
 
 /* ---- Artikel ---- */
 function artikelForm(a={}){
+  artikelFotoFile=null;
   openModal(a.id?'Artikel bearbeiten':'Neuer Artikel',`<form data-form="artikel" data-id="${a.id||''}" class="grid" style="gap:12px"><div class="fields">
    ${fld('name','Bezeichnung (z. B. Koleston 7/1)',a.name)}${fld('marke','Marke / Hersteller',a.marke)}
    <div class="field"><label for="f-ean">EAN / Barcode</label><div class="actions" style="flex-wrap:nowrap"><input id="f-ean" name="ean" value="${esc(a.ean||'')}" inputmode="numeric"><button type="button" class="btn sm" data-act="ean-scan">Scannen</button></div></div>
    <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option ${a.kategorie===k?'selected':''}>${k}</option>`).join('')}</select></div>
    ${fld('einheit','Einheit',a.einheit||'Stk')}${a.id?'':fld('bestand','Anfangsbestand',a.bestand||0,'number','step="any" min="0"')}${fld('minBestand','Mindestbestand (Warnung)',a.minBestand||0,'number','step="any" min="0"')}
    ${fld('ekPreis','Einkaufspreis (€)',a.ekPreis?eurPlain(a.ekPreis):'','text','inputmode="decimal"')}${fld('vkPreis','Verkaufspreis (€, bei Verkaufsware)',a.vkPreis?eurPlain(a.vkPreis):'','text','inputmode="decimal"')}${fld('mhd','Haltbar bis (MHD)',a.mhd,'date')}</div>
+   <div class="field"><span class="label">Produktfoto</span><div class="thumbs" id="a-thumb">${a.foto?`<img class="thumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="Produktfoto">`:''}</div><label class="btn" style="align-self:flex-start">${a.foto?'Foto ersetzen':'Foto aufnehmen / wählen'}<input type="file" accept="image/*" id="a-foto" hidden></label></div>
    <div class="modal-foot">${a.id?`<button type="button" class="btn danger" data-act="artikel-del" data-id="${a.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
 }
 function artikelAktion(a){
   const hist=S.bewegungen.filter(b=>b.artikelId===a.id).sort((x,y)=>x.ts<y.ts?1:-1).slice(0,12);
   const ARTL={zugang:'Eingang',abgang:'Ausgang',verbrauch:'Verbrauch',verkauf:'Verkauf',inventur:'Inventur'};
-  openModal(a.name,`<div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}</div>
+  openModal(a.name,`<div style="display:flex;gap:14px;align-items:center">${a.foto?`<img class="pthumb big" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="Produktfoto" data-act="foto" data-id="${a.foto}">`:''}<div class="small muted">${esc([a.marke,a.kategorie,a.ean].filter(Boolean).join(' · '))}${a.info?'<br>'+esc(a.info):''}</div></div>
    <div class="grid g3" style="gap:10px"><div class="card stat"><span class="label">Bestand</span><b>${num(a.bestand)} ${esc(a.einheit||'Stk')}</b></div><div class="card stat"><span class="label">Mindestbestand</span><b>${num(a.minBestand)}</b></div><div class="card stat"><span class="label">VK-Preis</span><b>${a.vkPreis?eur(a.vkPreis):'–'}</b></div></div>
    ${a.suche==='offen'?'<div class="notice info">Name und Hersteller werden gerade automatisch gesucht.</div>':a.suche==='nicht_gefunden'?'<div class="notice">Für diesen Barcode wurde im Internet nichts gefunden. Bitte über „Bearbeiten“ selbst eintragen.</div>':''}
    ${a.info?`<div class="small muted">${esc(a.info)}</div>`:''}${a.mhd?`<div class="small">Haltbar bis: <b>${fmtDate(a.mhd)}</b></div>`:''}
@@ -673,11 +678,13 @@ function lookupEan(code){
   if(a)artikelAktion(a);else neuScanForm(code);
 }
 function neuScanForm(code){
+  artikelFotoFile=null;const a={};
   openModal('Neuer Barcode',`<form data-form="scanneu" data-ean="${esc(code)}" class="grid" style="gap:12px">
    <div class="notice info">Barcode <b class="num">${esc(code)}</b> ist neu. Name und Hersteller werden automatisch in einer freien Produktdatenbank gesucht (sobald Internet da ist). Profi-Haarfarben sind dort nicht immer enthalten – dann den Namen einmal selbst eintragen.</div>
    <div class="fields">${fld('name','Bezeichnung (optional)','')}
    <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option>${k}</option>`).join('')}</select></div>
    ${fld('menge','Menge (Eingang)',1,'number','min="0" step="any"')}${fld('mhd','Haltbar bis (optional)','','date')}</div>
+   <div class="field"><span class="label">Produktfoto (optional – sonst wird ein Bild aus der Datenbank gesucht)</span><div class="thumbs" id="a-thumb">${a.foto?`<img class="thumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="Produktfoto">`:''}</div><label class="btn" style="align-self:flex-start">${a.foto?'Foto ersetzen':'Foto aufnehmen / wählen'}<input type="file" accept="image/*" id="a-foto" hidden></label></div>
    <div class="modal-foot"><button type="button" class="btn" data-act="scan-full" data-ean="${esc(code)}" style="margin-right:auto">Alle Angaben selbst eingeben</button><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
 }
 function mhdInfo(a){if(!a.mhd)return null;const d=Math.round((parseDate(a.mhd)-parseDate(today()))/864e5);return d<0?{cls:'bad',txt:'abgelaufen '+fmtDate(a.mhd)}:d<=60?{cls:'warn',txt:'MHD '+fmtDate(a.mhd)}:{cls:'',txt:'MHD '+fmtDate(a.mhd)}}
@@ -937,6 +944,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='kasse-monat'){UI.kasseMonat=t.value;renderBody()}
   else if(t.id==='euer-jahr'){UI.euerJahr=t.value;renderBody()}
   else if(t.id==='restore-input'&&t.files&&t.files.length){const files=[...t.files];const pw=($('#f-rpw')||{}).value||'';t.value='';confirmBox('Sicherung laden',`${files.length} Datei(en) laden? Die Daten auf diesem iPad werden durch den Stand der neuesten Sicherung <b>ersetzt</b>.`,'Laden und ersetzen',()=>sicherungLaden(files,pw))}
+  else if(t.id==='a-foto'&&t.files&&t.files[0]){artikelFotoFile=t.files[0];const box=$('#a-thumb');if(box)box.innerHTML=`<img class="thumb" src="${URL.createObjectURL(artikelFotoFile)}" alt="Neues Produktfoto">`;t.value=''}
   else if(t.id==='k-beleg'){const f0=t.files&&t.files[0];const frm=t.closest('form');if(f0&&frm&&frm.dataset.art==='ausgabe'&&!belegFiles.length)belegLesen(f0,frm);const room=4-belegFiles.length;[...t.files].slice(0,Math.max(0,room)).forEach(f=>belegFiles.push(f));if(t.files.length>room)toast('Maximal 4 Seiten pro Beleg.');t.value='';renderBelegFiles()}
 });
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#scanner').hidden){scanCb=null;stopScan()}else if(!$('#modal-root').hidden)closeModal()});
@@ -981,6 +989,7 @@ const FORMS={
    const ean=v.ean.trim();const dup=ean&&S.artikel.find(x=>x.ean===ean&&x.id!==f.dataset.id);if(dup){toast('Dieser Barcode gehört schon zu „'+dup.name+'“.',4000);return false}
    const old=S.artikel.find(x=>x.id===f.dataset.id)||{};const nm=v.name.trim();
    const data={name:nm,marke:v.marke.trim(),ean,kategorie:v.kategorie,einheit:v.einheit.trim()||'Stk',minBestand:num(v.minBestand),ekPreis:parseEur(v.ekPreis)||0,vkPreis:parseEur(v.vkPreis)||0,mhd:v.mhd||'',suche:nm==='Unbekannter Artikel'?(old.suche||(ean?'offen':'')):''};
+   if(artikelFotoFile){try{data.foto=await produktFoto(artikelFotoFile);if(old.foto)assets.delete(old.foto).catch(()=>{})}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}}
    if(f.dataset.id){await db.doc('artikel/'+f.dataset.id).update(data)}
    else{const id=uid();await db.doc('artikel/'+id).set({...data,bestand:0});const st=num(v.bestand);if(st)await lagerBewegung(id,st,'zugang','Anfangsbestand')}
    toast('Artikel gespeichert')},
@@ -1007,7 +1016,8 @@ const FORMS={
    if(S.settings.recoveryHash&&await pinHash('R:'+fmt)===S.settings.recoveryHash){await mutate('settings/main',d=>({...d,pinHash:'',recoveryHash:'',appLock:false}));UI.appLocked=false;UI.pinRecover=false;UI.unlocked=false;toast('Entsperrt. Bitte unter „Mehr“ eine neue PIN festlegen.',6000);UI.view='mehr';renderNav();renderShell()}
    else toast('Code stimmt nicht.');return false},
  async scanneu(f){const v=Object.fromEntries(new FormData(f));const nm=v.name.trim();const id=uid();const menge=num(v.menge);
-   await db.doc('artikel/'+id).set({name:nm||'Unbekannter Artikel',marke:'',ean:f.dataset.ean,kategorie:v.kategorie,einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:nm?'':'offen',erfasst:new Date().toISOString()});
+   let foto='';if(artikelFotoFile){try{foto=await produktFoto(artikelFotoFile)}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}}
+   await db.doc('artikel/'+id).set({foto,name:nm||'Unbekannter Artikel',marke:'',ean:f.dataset.ean,kategorie:v.kategorie,einheit:'Stk',minBestand:0,ekPreis:0,vkPreis:0,bestand:0,mhd:'',suche:nm?'':'offen',erfasst:new Date().toISOString()});
    if(menge>0)await lagerBewegung(id,menge,'zugang','Erfasst per Barcode',{mhd:v.mhd||''});
    toast(nm?'Artikel gespeichert':'Gespeichert – Name wird gesucht …',3500);if(!nm)setTimeout(offeneSuchen,300)},
  async kasse(f){const v=Object.fromEntries(new FormData(f));const art=f.dataset.art;const betrag=parseEur(v.betrag);
@@ -1097,6 +1107,8 @@ async function saveFile(filename,data){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return true;
 }
 
+let artikelFotoFile=null;
+async function produktFoto(file){const b=await compressImage(file,1200,.85);const r=await assets.upload(b,{type:'image/jpeg'});return r.id}
 /* ================= Barcode mit Live-Kamera ================= */
 let scanCb=null,liveScanner=null;
 function startScan(cb){scanCb=cb;const o=$('#scanner');o.hidden=false;$('#scan-manual').value='';$('#scan-msg').textContent='Barcode in den Rahmen halten …';
@@ -1127,9 +1139,9 @@ $('#scan-input').addEventListener('change',async ev=>{const f=ev.target.files&&e
 async function produktSuchen(ean){
   const hosts=['world.openbeautyfacts.org','world.openproductsfacts.org','world.openfoodfacts.org'];
   for(const h of hosts){try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
-    const r=await fetch(`https://${h}/api/v2/product/${encodeURIComponent(ean)}.json?fields=product_name,product_name_de,brands,quantity`,{signal:ctl.signal});clearTimeout(to);
+    const r=await fetch(`https://${h}/api/v2/product/${encodeURIComponent(ean)}.json?fields=product_name,product_name_de,brands,quantity,image_front_small_url,image_front_url,image_url`,{signal:ctl.signal});clearTimeout(to);
     if(!r.ok)continue;const j=await r.json();const p=j&&j.product;const name=p&&(p.product_name_de||p.product_name);
-    if(j.status===1&&name)return {name:String(name).trim(),marke:String(p.brands||'').split(',')[0].trim(),info:p.quantity?('Inhalt: '+p.quantity):'',quelle:h}}catch(_){}}
+    if(j.status===1&&name)return {name:String(name).trim(),marke:String(p.brands||'').split(',')[0].trim(),info:p.quantity?('Inhalt: '+p.quantity):'',quelle:h,bild:p.image_front_url||p.image_url||p.image_front_small_url||''}}catch(_){}}
   return null;
 }
 let suchLaeuft=false;
@@ -1137,7 +1149,8 @@ async function offeneSuchen(){
   if(suchLaeuft||!navigator.onLine)return;suchLaeuft=true;
   try{for(const a of S.artikel.filter(x=>x.suche==='offen'&&x.ean)){
     const p=await produktSuchen(a.ean);
-    if(p)await db.doc('artikel/'+a.id).update({name:a.name==='Unbekannter Artikel'?p.name:a.name,marke:a.marke||p.marke,info:p.info,quelle:p.quelle,suche:''});
+    let foto=a.foto||'';if(p&&p.bild&&!foto){try{const r=await fetch(p.bild);const bl=await r.blob();if(r.ok&&/^image\//.test(bl.type))foto=await produktFoto(bl)}catch(_){}}
+    if(p)await db.doc('artikel/'+a.id).update({foto,name:a.name==='Unbekannter Artikel'?p.name:a.name,marke:a.marke||p.marke,info:p.info,quelle:p.quelle,suche:''});
     else await db.doc('artikel/'+a.id).update({suche:'nicht_gefunden'});
   }}catch(e){console.warn(e)}finally{suchLaeuft=false}
 }
