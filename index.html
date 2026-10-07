@@ -329,7 +329,6 @@ const lowStock=()=>S.artikel.filter(a=>num(a.minBestand)>0&&num(a.bestand)<=num(
 
 /* ---------- Schreiben: Kasse ---------- */
 async function buchen(e){
-  e={...e,erfasstVon:(UI.user&&UI.user.name)||''};
   const ym=ymOf(e.datum);let saved;
   await mutate('kasse/'+ym,d=>{d.entries=d.entries||[];const entry={id:uid(),ts:new Date().toISOString(),...e,nr:nextNr(e.datum,d.entries)};d.entries.push(entry);saved=entry;return d});
   return saved;
@@ -908,7 +907,11 @@ const ACT={
  'sicherung-voll':()=>sicherungErstellen(true).catch(e=>{console.error(e);toast('Sicherung fehlgeschlagen.')}),
  'monat-pdf':()=>saveFile('Monatsabschluss_'+UI.kasseMonat+'.pdf',monatsPDF(UI.kasseMonat)),
  'logout':()=>abmelden(),
- 'login-sel':el=>{UI.loginSel=el.dataset.id;renderBody()},
+ 'login-sel':el=>{UI.loginSel=el.dataset.id;UI.loginPin='';renderBody()},
+ 'login-key':el=>{const k=el.dataset.k;if(k==='⌫')UI.loginPin=(UI.loginPin||'').slice(0,-1);else if((UI.loginPin||'').length<4)UI.loginPin=(UI.loginPin||'')+k;renderBody();if((UI.loginPin||'').length===4)loginPruefen()},
+ 'login-bio':()=>{const u=users().find(x=>x.id===(UI.loginSel||(users().length===1?users()[0].id:null)));if(u&&u.cred)bioAnmelden(u)},
+ 'bio-ein':el=>{const u=users().find(x=>x.id===el.dataset.id);if(u&&UI.user&&UI.user.id===u.id)bioEinrichten(u)},
+ 'bio-aus':el=>{const id=el.dataset.id;mutate('settings/main',d=>({...d,users:(d.users||[]).map(x=>x.id===id?{...x,cred:''}:x)})).then(()=>toast('Face ID / Touch ID ausgeschaltet'))},
  'user-neu':()=>userForm(null),
  'user-pw':el=>userForm(users().find(u=>u.id===el.dataset.id)),
  'user-del':el=>{const u=users().find(x=>x.id===el.dataset.id);confirmBox('Benutzer löschen',`Zugang von <b>${esc(u.name)}</b> löschen?`,'Löschen',async()=>{await mutate('settings/main',d=>({...d,users:(d.users||[]).filter(x=>x.id!==u.id)}));toast('Gelöscht')})},
@@ -1013,20 +1016,16 @@ const FORMS={
      return doc});
    UI.posReset=true;renderBody();window.scrollTo(0,0);toast('Tageseinnahmen '+fmtDate(d)+' gespeichert: '+eur(bar+karte),3500);UI.askBackup=true;renderBody();return false},
  async setup(f){const v=Object.fromEntries(new FormData(f));
-   if(!v.a_name.trim()){toast('Bitte Namen des Inhabers eingeben.');return false}
-   if(v.a_pw.length<6){toast('Inhaber-Passwort: mindestens 6 Zeichen.');return false}
-   if(v.a_pw!==v.a_pw2){toast('Die Passwörter stimmen nicht überein.');return false}
-   if(v.u_name.trim()&&v.u_pw.length<4){toast('Benutzer-Passwort: mindestens 4 Zeichen.');return false}
-   const L=[await neuerUser(v.a_name,'admin',v.a_pw)];if(v.u_name.trim())L.push(await neuerUser(v.u_name,'user',v.u_pw));
+   if(!pinOk4(v.a_pw)){toast('Admin-PIN: genau 4 Ziffern.');return false}
+   if(v.a_pw!==v.a_pw2){toast('Die Admin-PINs stimmen nicht überein.');return false}
+   if(!pinOk4(v.s_pw)){toast('PIN für Selda: genau 4 Ziffern.');return false}
+   if(v.d_name.trim()&&!pinOk4(v.d_pw)){toast('PIN für '+v.d_name.trim()+': genau 4 Ziffern.');return false}
+   const L=[await neuerUser('Admin','admin',v.a_pw),await neuerUser('Selda','user',v.s_pw)];if(v.d_name.trim())L.push(await neuerUser(v.d_name,'user',v.d_pw));
    const code=recoveryCode();const rh=await pinHash('R:'+code);
    await mutate('settings/main',d=>({...d,users:L,recoveryHash:rh}));UI.showRecovery=code;renderBody();return false},
- async login(f){const pw=f.querySelector('[name=pw]');const u=users().find(x=>x.id===(UI.loginSel||(users().length===1?users()[0].id:null)));if(!u||!pw)return false;
-   if(await pwHash(pw.value,u.salt)===u.hash){anmelden(u)}else{pw.value='';toast('Falsches Passwort.');pw.focus()}return false},
- async userform(f){const v=Object.fromEntries(new FormData(f));if((v.pw||'').length<4){toast('Mindestens 4 Zeichen.');return false}if(v.pw!==v.pw2){toast('Die Passwörter stimmen nicht überein.');return false}
-   if(f.dataset.id){const u=users().find(x=>x.id===f.dataset.id);if(u.role==='admin'&&v.pw.length<6){toast('Inhaber-Passwort: mindestens 6 Zeichen.');return false}
-     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await pwHash(v.pw,salt);await mutate('settings/main',d=>({...d,users:(d.users||[]).map(x=>x.id===u.id?{...x,salt,hash}:x)}))}
-   else{if(!v.name.trim()){toast('Bitte einen Namen eingeben.');return false}if(v.role==='admin'&&v.pw.length<6){toast('Inhaber-Passwort: mindestens 6 Zeichen.');return false}
-     const nu=await neuerUser(v.name,v.role,v.pw);await mutate('settings/main',d=>({...d,users:[...(d.users||[]),nu]}))}
+ async userform(f){const v=Object.fromEntries(new FormData(f));if(!pinOk4(v.pw)){toast('PIN: genau 4 Ziffern.');return false}if(v.pw!==v.pw2){toast('Die PINs stimmen nicht überein.');return false}
+   if(f.dataset.id){const u=users().find(x=>x.id===f.dataset.id);const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await pwHash(v.pw,salt);await mutate('settings/main',d=>({...d,users:(d.users||[]).map(x=>x.id===u.id?{...x,salt,hash}:x)}))}
+   else{if(!v.name.trim()){toast('Bitte einen Namen eingeben.');return false}const nu=await neuerUser(v.name,v.role,v.pw);await mutate('settings/main',d=>({...d,users:[...(d.users||[]),nu]}))}
    toast('Gespeichert')},
  async appsperre(f){const on=f.querySelector('[name=appLock]').checked;if(on&&!S.settings.pinHash){toast('Zuerst eine PIN festlegen.');return false}
    await mutate('settings/main',d=>({...d,appLock:on}));toast(on?'App-Sperre eingeschaltet':'App-Sperre ausgeschaltet');return false},
@@ -1034,7 +1033,7 @@ const FORMS={
    if(pw){await IDB.put('meta','backupPw',pw);UI.hasBackupPw=true;toast('Passwort gespeichert – Sicherungen werden ab jetzt verschlüsselt.',5000)}else{await IDB.del('meta','backupPw');UI.hasBackupPw=false;toast('Passwort entfernt – Sicherungen sind unverschlüsselt.',5000)}
    f.reset();renderBody();return false},
  async recover(f){const code0=String(f.querySelector('[name=code]').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const fmt0=code0.slice(0,5)+'-'+code0.slice(5);const npw=(f.querySelector('[name=pw]')||{}).value||'';
-   if(users().length){if(npw.length<6){toast('Neues Passwort: mindestens 6 Zeichen.');return false}
+   if(users().length){if(!pinOk4(npw)){toast('Neue PIN: genau 4 Ziffern.');return false}
      if(!(S.settings.recoveryHash&&await pinHash('R:'+fmt0)===S.settings.recoveryHash)){toast('Code stimmt nicht.');return false}
      const a=users().find(u=>u.role==='admin');const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await pwHash(npw,salt);
      const code=recoveryCode();const rh=await pinHash('R:'+code);
@@ -1267,46 +1266,74 @@ function sicherungCard(){
 /* ================= Benutzer & Anmeldung ================= */
 const users=()=>Array.isArray(S.settings.users)?S.settings.users:[];
 const isAdmin=()=>!!(UI.user&&UI.user.role==='admin');
-const ADMIN_ONLY=new Set(['storno','kunde-del','besuch-del','artikel-del','pin-change','lock','user-neu','user-del','user-pw','sicherung-voll']);
+const ADMIN_ONLY=new Set(['storno','kunde-del','besuch-del','artikel-del','pin-change','lock','user-neu','user-del','user-pw','bio-aus','sicherung-voll']);
 async function pwHash(pw,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
   return b64(await crypto.subtle.deriveBits({name:'PBKDF2',salt:unb64(salt),iterations:150000,hash:'SHA-256'},k,256))}
 async function neuerUser(name,role,pw){const salt=b64(crypto.getRandomValues(new Uint8Array(16)));return {id:uid(),name:name.trim(),role,salt,hash:await pwHash(pw,salt)}}
 function abmelden(){if(!UI.user&&users().length)return;UI.user=null;UI.loginSel=null;UI.appLocked=true;stopScan();if(!$('#modal-root').hidden)hideModal();document.body.classList.remove('role-user');renderNav();renderShell()}
 function anmelden(u){UI.user=u;UI.appLocked=false;UI.loginSel=null;lastActive=Date.now();document.body.classList.toggle('role-user',u.role!=='admin');
   const lb=$('#lockbtn');if(lb){lb.hidden=false;lb.textContent=u.name+' · Abmelden'}renderNav();renderShell()}
+const pinOk4=v=>/^\d{4}$/.test(String(v||''));
+function pinPad(act){return `<div class="pin-dots" aria-live="polite">${[0,1,2,3].map(i=>`<i class="${i<(UI.loginPin||'').length?'on':''}"></i>`).join('')}</div>
+   <div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','⌫'].map(x=>x?`<button type="button" data-act="${act}" data-k="${x}" aria-label="${x==='⌫'?'Löschen':x}">${x}</button>`:'<span></span>').join('')}</div>`}
 function loginScreen(){
   const L=users();
   if(UI.showRecovery)return `<div class="card grid" style="gap:14px;max-width:440px;margin:24px auto;text-align:center"><h2>Notfall-Code aufschreiben</h2>
-   <p class="small" style="margin:0">Wenn das Inhaber-Passwort vergessen wird, öffnet nur dieser Code die App wieder. Bitte jetzt auf Papier notieren und sicher aufbewahren. Er wird nur dieses eine Mal angezeigt.</p>
+   <p class="small" style="margin:0">Wenn die Admin-PIN vergessen wird, öffnet nur dieser Code die App wieder. Bitte jetzt auf Papier notieren und sicher aufbewahren. Er wird nur dieses eine Mal angezeigt.</p>
    <div style="font:700 2rem ui-monospace,Menlo,monospace;letter-spacing:.1em">${esc(UI.showRecovery)}</div><button class="btn primary" data-act="recovery-ok">Notiert – weiter</button></div>`;
+  const pinF=(n,l)=>fld(n,l,'','password','inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"');
   if(!L.length)return `<form data-form="setup" class="card grid" style="gap:14px;max-width:560px;margin:24px auto"><h2>Willkommen bei SEEN Salon</h2>
-   <p class="small muted" style="margin:0">Einmalig zwei Zugänge anlegen. Der <b>Inhaber</b> darf alles (Preise, Einstellungen, Storno, Löschen, Wiederherstellen). Der <b>Benutzer</b> erledigt die tägliche Arbeit.</p>
-   <h3 style="margin:6px 0 0">Inhaber (volle Rechte)</h3><div class="fields">${fld('a_name','Name','')}${fld('a_pw','Passwort (mind. 6 Zeichen)','','password','autocomplete="new-password"')}${fld('a_pw2','Passwort wiederholen','','password','autocomplete="new-password"')}</div>
-   <h3 style="margin:6px 0 0">Benutzer (optional)</h3><div class="fields">${fld('u_name','Name','')}${fld('u_pw','Passwort (mind. 4 Zeichen)','','password','autocomplete="new-password"')}</div>
+   <p class="small muted" style="margin:0">Einmalig die Zugänge anlegen, jeweils mit einer <b>4-stelligen PIN</b>. <b>Admin</b> darf alles (Preise, Einstellungen, Storno, Löschen, Wiederherstellen). Die anderen erledigen die tägliche Arbeit.</p>
+   <h3 style="margin:6px 0 0">Admin (volle Rechte)</h3><div class="fields">${pinF('a_pw','PIN')}${pinF('a_pw2','PIN wiederholen')}</div>
+   <h3 style="margin:6px 0 0">Selda</h3><div class="fields">${pinF('s_pw','PIN')}</div>
+   <h3 style="margin:6px 0 0">3. Person (optional)</h3><div class="fields">${fld('d_name','Name','')}${pinF('d_pw','PIN')}</div>
    <button class="btn primary pos-go">Zugänge anlegen</button>
    <div class="field" style="border-top:1px solid var(--line);padding-top:12px"><span class="label">Neues iPad? Stattdessen Sicherung laden</span><p class="small muted" style="margin:0">Die Zugänge kommen dann aus der Sicherung.</p>
     <div class="fields" style="align-items:end"><div class="field"><label for="f-rpw">Passwort der Sicherung (falls verschlüsselt)</label><input id="f-rpw" type="password" autocomplete="off"></div><label class="btn">Sicherungsdateien wählen<input type="file" id="restore-input" accept=".json,application/json" multiple hidden></label></div></div></form>`;
-  if(UI.pinRecover)return `<form data-form="recover" class="card grid" style="gap:14px;max-width:420px;margin:24px auto;text-align:center"><h2>Passwort vergessen</h2>
-   <p class="small muted" style="margin:0">Notfall-Code des Inhabers eingeben und ein neues Inhaber-Passwort festlegen.</p>
+  if(UI.pinRecover)return `<form data-form="recover" class="card grid" style="gap:14px;max-width:420px;margin:24px auto;text-align:center"><h2>PIN vergessen</h2>
+   <p class="small muted" style="margin:0">Notfall-Code eingeben und eine neue Admin-PIN festlegen. Die PINs der anderen kann der Admin danach unter „Einstellungen → Benutzer“ neu setzen.</p>
    <input name="code" autocomplete="off" autocapitalize="characters" style="text-align:center;font-size:1.3rem" placeholder="XXXXX-XXXXX">
-   <input name="pw" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 6 Zeichen)">
+   <input name="pw" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Neue Admin-PIN (4 Ziffern)" style="text-align:center">
    <button class="btn primary">Zurücksetzen und anmelden</button><button type="button" class="btn" data-act="recover-cancel">Zurück</button></form>`;
-  const sel=UI.loginSel||(L.length===1?L[0].id:null);const su=L.find(u=>u.id===sel);
-  return `<form data-form="login" class="card grid" style="gap:14px;max-width:440px;margin:24px auto;text-align:center"><h2>Anmelden</h2>
-   <div class="chips" style="justify-content:center">${L.map(u=>`<button type="button" class="chip" style="min-width:140px;min-height:60px;font-size:1.1rem" data-act="login-sel" data-id="${u.id}" aria-pressed="${u.id===sel}">${esc(u.name)}<br><small class="muted">${u.role==='admin'?'Inhaber':'Benutzer'}</small></button>`).join('')}</div>
-   ${su?`<input id="login-pw" name="pw" type="password" autocomplete="current-password" placeholder="Passwort von ${esc(su.name)}" style="text-align:center;font-size:1.2rem"><button class="btn primary pos-go">Anmelden</button>`:'<p class="small muted" style="margin:0">Bitte Ihren Namen antippen.</p>'}
-   <button type="button" class="btn sm" data-act="pin-forgot" style="justify-self:center">Passwort vergessen?</button></form>`;
+  const sel=UI.loginSel||(L.length===1?L[0].id:null);const su=L.find(u=>u.id===sel);const gesperrt=(UI.lockUntil||0)>Date.now();
+  return `<div class="card grid" style="gap:14px;max-width:420px;margin:24px auto;text-align:center"><h2>Anmelden</h2>
+   <div class="chips" style="justify-content:center">${L.map(u=>`<button type="button" class="chip" style="min-width:110px;min-height:60px;font-size:1.1rem" data-act="login-sel" data-id="${u.id}" aria-pressed="${u.id===sel}">${esc(u.name)}</button>`).join('')}</div>
+   ${su?(gesperrt?`<p class="notice">Zu viele falsche Eingaben. Bitte ${Math.ceil((UI.lockUntil-Date.now())/1000)} Sekunden warten.</p>`:`<div class="small muted">PIN von ${esc(su.name)}</div>${pinPad('login-key')}
+     ${su.cred?`<button type="button" class="btn" data-act="login-bio">Mit Face ID / Touch ID anmelden</button>`:''}`):'<p class="small muted" style="margin:0">Bitte Ihren Namen antippen.</p>'}
+   <button type="button" class="btn sm" data-act="pin-forgot" style="justify-self:center">PIN vergessen?</button></div>`;
 }
+async function loginPruefen(){const L=users();const u=L.find(x=>x.id===(UI.loginSel||(L.length===1?L[0].id:null)));const pin=UI.loginPin;UI.loginPin='';
+  if(!u)return;if(await pwHash(pin,u.salt)===u.hash){UI.fails=0;anmelden(u);return}
+  UI.fails=(UI.fails||0)+1;if(UI.fails>=5){UI.fails=0;UI.lockUntil=Date.now()+30000;setTimeout(()=>renderBody(),30500)}toast('Falsche PIN.');renderBody()}
+/* Face ID / Touch ID (WebAuthn, nur auf diesem Gerät) */
+async function bioVerfuegbar(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())}catch(_){return false}}
+async function bioEinrichten(u){
+  if(!await bioVerfuegbar()){toast('Face ID / Touch ID ist auf diesem Gerät nicht verfügbar oder nicht eingerichtet.',6000);return}
+  try{const c=await navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:'SEEN Salon',id:location.hostname},
+      user:{id:new TextEncoder().encode(u.id),name:u.name,displayName:u.name},pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000}});
+    const cred=b64(c.rawId);await mutate('settings/main',d=>({...d,users:(d.users||[]).map(x=>x.id===u.id?{...x,cred}:x)}));toast('Face ID / Touch ID für '+u.name+' eingerichtet.')}
+  catch(e){toast(e&&e.name==='NotAllowedError'?'Abgebrochen.':'Einrichten fehlgeschlagen.',4000)}}
+async function bioAnmelden(u){
+  try{const a=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:location.hostname,userVerification:'required',
+      allowCredentials:[{type:'public-key',id:unb64(u.cred),transports:['internal']}],timeout:60000}});
+    if(a&&b64(a.rawId)===u.cred)anmelden(u);else toast('Nicht erkannt – bitte PIN eingeben.')}
+  catch(e){toast('Nicht erkannt – bitte PIN eingeben.')}}
 function usersCard(){const L=users();
   return `<div class="card grid" style="gap:10px"><h3 style="margin:0">Benutzer</h3>
-   <div class="list">${L.map(u=>`<div class="row"><div class="grow"><div class="title">${esc(u.name)}</div><div class="small muted">${u.role==='admin'?'Inhaber – volle Rechte':'Benutzer – tägliche Arbeit'}</div></div><button class="btn sm" data-act="user-pw" data-id="${u.id}">Passwort ändern</button>${L.length>1&&!(u.role==='admin'&&L.filter(x=>x.role==='admin').length<2)?`<button class="btn sm danger" data-act="user-del" data-id="${u.id}">Löschen</button>`:''}</div>`).join('')}</div>
-   <div class="actions"><button class="btn" data-act="user-neu">+ Benutzer</button></div>
+   <div class="list">${L.map(u=>`<div class="row" style="flex-wrap:wrap"><div class="grow"><div class="title">${esc(u.name)}</div><div class="small muted">${u.role==='admin'?'Admin – volle Rechte':'Tägliche Arbeit'}${u.cred?' · Face ID / Touch ID aktiv':''}</div></div>
+     <button class="btn sm" data-act="user-pw" data-id="${u.id}">PIN ändern</button>
+     ${UI.user&&UI.user.id===u.id?`<button class="btn sm" data-act="${u.cred?'bio-aus':'bio-ein'}" data-id="${u.id}">${u.cred?'Face ID aus':'Face ID / Touch ID einrichten'}</button>`:''}
+     ${L.length>1&&u.role!=='admin'?`<button class="btn sm danger" data-act="user-del" data-id="${u.id}">Löschen</button>`:''}</div>`).join('')}</div>
+   <div class="actions"><button class="btn" data-act="user-neu">+ Person</button></div>
    <label class="small" style="display:flex;gap:8px;align-items:center">Automatisch abmelden nach <select id="logout-min" style="width:auto">${[5,15,30,60].map(m=>`<option value="${m}" ${(S.settings.logoutMin||5)===m?'selected':''}>${m} Minuten</option>`).join('')}</select> ohne Bedienung</label>
-   <p class="small muted" style="margin:0">Benutzer dürfen nicht: Einstellungen und Preise ändern, Buchungen stornieren, Kunden, Besuche oder Artikel löschen, Sicherungen laden.</p></div>`}
+   <p class="small muted" style="margin:0"><b>Face ID / Touch ID:</b> Jede Person richtet es angemeldet für sich selbst ein. Achtung: Das iPad unterscheidet nicht, <i>wessen</i> Gesicht oder Finger gespeichert ist – jedes im iPad eingetragene Gesicht bzw. jeder Finger öffnet jeden Zugang mit Face ID. Deshalb für den Admin am besten nur die PIN verwenden.</p>
+   <p class="small muted" style="margin:0">Ohne Admin-Rechte nicht erlaubt: Einstellungen und Preise ändern, Buchungen stornieren, Kunden, Besuche oder Artikel löschen, Sicherungen laden.</p></div>`}
 function userForm(u){
-  openModal(u?'Passwort ändern – '+u.name:'Neuer Benutzer',`<form data-form="userform" data-id="${u?u.id:''}" class="grid" style="gap:12px">
-   ${u?'':`<div class="fields">${fld('name','Name','')}<div class="field"><label for="f-role">Rolle</label><select id="f-role" name="role"><option value="user">Benutzer</option><option value="admin">Inhaber</option></select></div></div>`}
-   <div class="fields">${fld('pw','Neues Passwort','','password','autocomplete="new-password"')}${fld('pw2','Wiederholen','','password','autocomplete="new-password"')}</div>
+  const pinF=(n,l)=>fld(n,l,'','password','inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"');
+  openModal(u?'PIN ändern – '+u.name:'Neue Person',`<form data-form="userform" data-id="${u?u.id:''}" class="grid" style="gap:12px">
+   ${u?'':`<div class="fields">${fld('name','Name','')}<div class="field"><label for="f-role">Rechte</label><select id="f-role" name="role"><option value="user">Tägliche Arbeit</option><option value="admin">Admin – volle Rechte</option></select></div></div>`}
+   <div class="fields">${pinF('pw','Neue PIN (4 Ziffern)')}${pinF('pw2','PIN wiederholen')}</div>
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`)}
 
 /* ================= App-Sperre mit PIN ================= */
