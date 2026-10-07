@@ -439,7 +439,7 @@ heute:()=>loadingOr(()=>{
   const fv=isAdmin()?fvStand():null;const fvWarn=fv&&(fv.G>=fv.warn||fv.proj>fv.grenze);
   const sichAlt=(S.kasse.length||S.kunden.length)&&(!UI.lastBackup||Date.now()-UI.lastBackup>2*864e5);
   const mhdList=S.artikel.filter(a=>{const m=mhdInfo(a);return m&&m.cls&&num(a.bestand)>0}).sort((a,b)=>a.mhd.localeCompare(b.mhd));
-  return `${fvWarn?`<div class="notice" style="margin-bottom:16px;background:var(--bad-soft)"><b>Familienversicherung:</b> Gewinn ${new Date().getFullYear()} bisher ${eur(fv.G)}, Grenze ${eur(fv.grenze)}${fv.schliessen>0?' – bei gleichem Tempo etwa <b>'+fv.schliessen+' Arbeitstage</b> zu viel':''}. <button class="btn sm" data-act="kasse-tab" data-v="fv">Ansehen</button></div>`:''}${sichAlt?`<div class="notice" style="margin-bottom:16px">Die letzte Datensicherung ist ${UI.lastBackup?'älter als 2 Tage':'noch nie erstellt worden'}. <button class="btn sm" data-act="sicherung">Jetzt sichern</button></div>`:''}${setup?`<div class="notice info" style="margin-bottom:16px">Bitte zuerst unter <b>Mehr → Einstellungen</b> Salonname, Adresse, Steuernummer und Leistungspreise eintragen. Diese Angaben stehen auf jeder Quittung. <button class="btn sm" data-act="nav" data-v="mehr">Jetzt eintragen</button></div>`:''}
+  return `${fvWarn?`<div class="notice" style="margin-bottom:16px;background:var(--bad-soft)"><b>Familienversicherung:</b> Gewinn ${new Date().getFullYear()} bisher ${eur(fv.G)}, Grenze für den Gewinn ${eur(fv.grenze)}${fv.schliessen>0?' – bei gleichem Tempo etwa <b>'+fv.schliessen+' Arbeitstage</b> zu viel':''}. <button class="btn sm" data-act="kasse-tab" data-v="fv">Ansehen</button></div>`:''}${sichAlt?`<div class="notice" style="margin-bottom:16px">Die letzte Datensicherung ist ${UI.lastBackup?'älter als 2 Tage':'noch nie erstellt worden'}. <button class="btn sm" data-act="sicherung">Jetzt sichern</button></div>`:''}${setup?`<div class="notice info" style="margin-bottom:16px">Bitte zuerst unter <b>Mehr → Einstellungen</b> Salonname, Adresse, Steuernummer und Leistungspreise eintragen. Diese Angaben stehen auf jeder Quittung. <button class="btn sm" data-act="nav" data-v="mehr">Jetzt eintragen</button></div>`:''}
   <div class="grid g3" style="margin-bottom:16px">
    <div class="card stat"><span class="label">Einnahmen heute</span><b>${eur(ein)}</b><span class="small muted">${heuteK.filter(k=>k.art==='einnahme').length} Buchungen</span></div>
    <div class="card stat"><span class="label">Ausgaben heute</span><b>${eur(aus)}</b></div>
@@ -557,12 +557,12 @@ function fvStand(){
   const y=String(new Date().getFullYear());const t=today();
   const L=S.kasse.filter(k=>String(k.datum).startsWith(y)&&k.datum<=t&&!isPrivat(k));
   const E=L.filter(k=>k.art==='einnahme').reduce((a,k)=>a+k.betrag,0),A=L.filter(k=>k.art==='ausgabe').reduce((a,k)=>a+k.betrag,0);const G=E-A;
-  const monat=Number(S.settings.fvGrenzeMonat)||56500;const grenze=monat*12;const warn=Number(S.settings.fvWarn)||500000;
+  const monat=Number(S.settings.fvGrenzeMonat)||56500;const sonst=Number(S.settings.fvSonstige)||0;const grenzeAlle=monat*12;const grenze=grenzeAlle-sonst*12;const warn=Number(S.settings.fvWarn)||500000;
   const ruhe=ruhetage();const arbeitstage=[...new Set(L.filter(k=>k.tagesEinnahme).map(k=>k.datum))].length;
   let rest=0;for(let d=addDays(t,1);d.slice(0,4)===y;d=addDays(d,1)){if(!ruhe.includes(parseDate(d).getDay()))rest++}
   const proTag=arbeitstage?G/arbeitstage:0;const proj=Math.round(G+proTag*rest);
   const spiel=grenze-G;const moeglich=proTag>0?Math.floor(spiel/proTag):rest;const schliessen=proTag>0?Math.max(0,rest-Math.max(0,moeglich)):0;
-  return {y,E,A,G,monat,grenze,warn,arbeitstage,rest,proTag,proj,spiel,schliessen,L};
+  return {y,E,A,G,monat,grenze,grenzeAlle,sonst,warn,arbeitstage,rest,proTag,proj,spiel,schliessen,L};
 }
 function kasseFV(){
   const f=fvStand();const pct=v=>Math.max(0,Math.min(100,v/f.grenze*100));
@@ -575,18 +575,19 @@ function kasseFV(){
   let g=[0,.5,1].map(q=>`<line class="grid" x1="${l}" x2="${W-r}" y1="${ys(top*q)}" y2="${ys(top*q)}"/><text class="tick" x="${l-6}" y="${ys(top*q)+4}" text-anchor="end">${ax(top*q)}</text>`).join('');
   g+=pts.map((p,i)=>{const cx=l+gw*i+gw/2,bw=Math.min(30,gw-12);if(p.zukunft)return `<text class="tick" x="${cx}" y="${H-8}" text-anchor="middle">${p.n}</text>`;const y0=t+ih,y1=ys(p.v),h=y0-y1,rr=Math.min(4,h,bw/2);
     return (p.v>0?`<path class="c-ein" d="M${cx-bw/2},${y0}V${y1+rr}Q${cx-bw/2},${y1} ${cx-bw/2+rr},${y1}H${cx+bw/2-rr}Q${cx+bw/2},${y1} ${cx+bw/2},${y1+rr}V${y0}Z"/>`:'')+`<text class="tick" x="${cx}" y="${H-8}" text-anchor="middle">${p.n}</text><rect class="hit" x="${l+gw*i}" y="${t}" width="${gw}" height="${ih}" data-tip="<b>Ende ${p.n}</b><br>Gewinn seit 1.1.: ${eur(p.v)}"/>`}).join('');
-  g+=`<line x1="${l}" x2="${W-r}" y1="${ys(f.grenze)}" y2="${ys(f.grenze)}" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4"/><text x="${W-r}" y="${ys(f.grenze)-6}" text-anchor="end" class="tick" style="fill:var(--bad);font-weight:700">Grenze ${ax(f.grenze)}</text>`;
+  g+=`<line x1="${l}" x2="${W-r}" y1="${ys(f.grenze)}" y2="${ys(f.grenze)}" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4"/><text x="${W-r}" y="${ys(f.grenze)-6}" text-anchor="end" class="tick" style="fill:var(--bad);font-weight:700">${f.sonst?'Grenze für Gewinn':'Grenze'} ${ax(f.grenze)}</text>`;
   g+=`<line x1="${l}" x2="${W-r}" y1="${ys(f.warn)}" y2="${ys(f.warn)}" style="stroke:var(--warn);stroke-width:2;stroke-dasharray:3 4"/><text x="${l+6}" y="${ys(f.warn)-6}" class="tick" style="fill:var(--warn);font-weight:700">Warnung ${ax(f.warn)}</text>`;
   return `<div class="grid g3" style="margin-bottom:16px">
     <div class="card stat"><span class="label">Gewinn ${f.y} bisher</span><b>${eur(f.G)}</b><span class="small"><span class="pill ${status[0]}">${status[1]}</span></span></div>
-    <div class="card stat"><span class="label">Noch Spielraum bis Grenze</span><b class="${f.spiel<0?'minus':''}">${eur(f.spiel)}</b><span class="small muted">Grenze ${eur(f.monat)} × 12 = ${eur(f.grenze)}</span></div>
+    <div class="card stat"><span class="label">Noch Spielraum bis Grenze</span><b class="${f.spiel<0?'minus':''}">${eur(f.spiel)}</b><span class="small muted">${eur(f.monat)} × 12 = ${eur(f.grenzeAlle)}${f.sonst?` − Miete ${eur(f.sonst*12)} = <b>${eur(f.grenze)}</b> für den Gewinn`:''}</span></div>
     <div class="card stat"><span class="label">Hochrechnung 31.12.</span><b class="${f.proj>f.grenze?'minus':''}">${eur(f.proj)}</b><span class="small muted">${f.arbeitstage} Arbeitstage bisher · Ø ${eur(Math.round(f.proTag))} Gewinn/Tag</span></div></div>
    <div class="card" style="margin-bottom:16px"><h3>Fortschritt</h3><div class="bar ${f.G>=f.grenze?'bad':f.G>=f.warn?'warn':''}" style="height:16px;position:relative"><i style="width:${pct(f.G)}%"></i><span style="position:absolute;left:${pct(f.warn)}%;top:-3px;bottom:-3px;border-left:2px dashed var(--warn)"></span></div>
     <p style="margin:12px 0 0">${f.schliessen>0?`Bei gleichem Tempo wird die Grenze überschritten. Rechnerisch etwa <b>${f.schliessen} von ${f.rest} restlichen Arbeitstagen</b> schließen – oder notwendige Anschaffungen (Material, Geräte) noch in diesem Jahr kaufen, das senkt den Gewinn.`:`Bei gleichem Tempo bleibt der Gewinn unter der Grenze. Es bleiben ${f.rest} Arbeitstage bis Jahresende.`}</p></div>
    <div class="card chart" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">Gewinn seit Jahresbeginn (aufsummiert)</h3><div class="legend"><span><i class="sw c-ein"></i>Gewinn kumuliert</span><span style="color:var(--bad)">– – Grenze</span><span style="color:var(--warn)">··· Warnung</span></div></div>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kumulierter Gewinn gegen Grenze">${g}</svg></div>
    <form class="card grid" data-form="fvset" style="gap:12px;margin-bottom:16px"><h3 style="margin:0">Grenzen einstellen</h3><div class="fields">
-    ${fld('fvm','Einkommensgrenze pro Monat (€)',eurPlain(f.monat),'text','inputmode="decimal"')}${fld('fvw','Warnung ab Jahresgewinn (€)',eurPlain(f.warn),'text','inputmode="decimal"')}</div>
+    ${fld('fvm','Einkommensgrenze pro Monat (€)',eurPlain(f.monat),'text','inputmode="decimal"')}${fld('fvs','Andere Einkünfte pro Monat, z. B. Miete (€)',eurPlain(f.sonst),'text','inputmode="decimal"')}${fld('fvw','Warnung ab Jahresgewinn (€)',eurPlain(f.warn),'text','inputmode="decimal"')}</div>
+    <p class="small muted" style="margin:0">Bei Miete zählt der Überschuss: Mieteinnahmen minus Kosten (Zinsen, Abschreibung, Reparaturen, Nebenkosten), so wie in der Steuererklärung (Anlage V). Dieser Betrag wird von der Grenze abgezogen; übrig bleibt der Spielraum für den Salon-Gewinn.</p>
     <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
    <div class="card legal"><h3>So rechnet die Krankenkasse (Stand 2026)</h3>
     <p><b>Grenze 2026:</b> Familienversicherte dürfen ein regelmäßiges Gesamteinkommen von höchstens <b>565 € im Monat</b> haben (ein Siebtel der Bezugsgröße von 3.955 €). Bei Selbstständigen zählt der <b>steuerliche Gewinn</b> (Einnahmen minus Ausgaben), auf den Monat umgerechnet – also höchstens <b>6.780 € im Jahr</b>. Der Wert ändert sich jedes Jahr zum 1. Januar; dann oben anpassen.</p>
@@ -1103,8 +1104,8 @@ const FORMS={
        else if(ex.length)doc.entries=doc.entries.filter(e=>!ex.includes(e))}
      return doc});
    UI.askBackup=true;renderBody();toast('Einnahmen gespeichert');return false},
- async fvset(f){if(!isAdmin())return false;const m=parseEur(f.querySelector('[name=fvm]').value),w=parseEur(f.querySelector('[name=fvw]').value);
-   if(!(m>0)||!(w>0)){toast('Bitte gültige Beträge eingeben.');return false}await mutate('settings/main',d=>({...d,fvGrenzeMonat:m,fvWarn:w}));toast('Gespeichert');return false},
+ async fvset(f){if(!isAdmin())return false;const m=parseEur(f.querySelector('[name=fvm]').value),w=parseEur(f.querySelector('[name=fvw]').value);const so0=f.querySelector('[name=fvs]').value.trim();const so=so0?parseEur(so0):0;if(isNaN(so)||so<0){toast('Bitte gültigen Betrag für andere Einkünfte.');return false}
+   if(!(m>0)||!(w>0)){toast('Bitte gültige Beträge eingeben.');return false}await mutate('settings/main',d=>({...d,fvGrenzeMonat:m,fvWarn:w,fvSonstige:so}));toast('Gespeichert');return false},
  async buchung(f){const v=Object.fromEntries(new FormData(f));const betrag=parseEur(v.betrag);if(!(betrag>0)){toast('Bitte einen gültigen Betrag eingeben.');return false}
    if(!v.datum){toast('Bitte ein Datum wählen.');return false}
    const old=S.kasse.find(k=>k.id===f.dataset.id);if(!old)return;let moved=null;
