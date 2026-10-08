@@ -989,6 +989,7 @@ const ACT={
  'scan-lager':()=>startScan(lookupEan),
  'art-foto':el=>{artFotoZiel=el.dataset.id;const i=$('#art-foto-input');i.value='';i.click()},
  'erkl-neu':el=>erklaerungForm(kundeById(el.dataset.id)),
+ 'wlan-neu':el=>wlanForm(kundeById(el.dataset.id)),
  'atest':el=>allergieTestForm(kundeById(el.dataset.id)),
  'erkl-send':async el=>{await pdfSenden(el.dataset.bid,el.dataset.name,kundeById(el.dataset.kunde))},
  'sig-clear':()=>sigClear(),
@@ -1201,14 +1202,24 @@ const FORMS={
    if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return false}
    const btn=f.querySelector('button.primary');btn.disabled=true;btn.textContent='Speichert …';
    const d=today();const an={datum:d,reaktion:!!v.reaktion,henna:!!v.henna,kopfhaut:!!v.kopfhaut,allergien:!!v.allergien,text:(v.atext||'').trim()};
-   const foto=!!v.foto,wlan=!!v.wlan;const sigUrl=sigJpeg();
-   try{const pdf=erklaerungPDF(k,an,{foto,wlan},sigUrl);const r=await assets.upload(pdf,{type:'application/pdf'});
+   const foto=!!v.foto;const sigUrl=sigJpeg();
+   try{const pdf=erklaerungPDF(k,an,{foto},sigUrl);const r=await assets.upload(pdf,{type:'application/pdf'});
      const name='Einverstaendnis_'+(kundeName(k)||'Kunde').replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,'_')+'_'+d+'.pdf';
-     await mutate('kunden/'+k.id,x=>({...x,anamnese:an,fotoEinwilligung:foto,einwilligungDatum:foto?(x.einwilligungDatum||d):'',wlan:wlan?d:(x.wlan||''),erklaerungen:[...(x.erklaerungen||[]),{id:uid(),datum:d,pdf:r.id,name}]}));
+     await mutate('kunden/'+k.id,x=>({...x,anamnese:an,fotoEinwilligung:foto,einwilligungDatum:foto?(x.einwilligungDatum||d):'',erklaerungen:[...(x.erklaerungen||[]),{id:uid(),typ:'gesundheit',datum:d,pdf:r.id,name}]}));
      openModal('Einverständnis gespeichert',`<p style="margin:0">Die unterschriebene Erklärung ist als PDF in der Kundenkarte archiviert.</p>${k.email?`<p class="small muted" style="margin:0">Beim Senden wird die E-Mail-Adresse <b>${esc(k.email)}</b> in die Zwischenablage kopiert – im Mail-Programm bei „An“ einfügen.</p>`:'<p class="small muted" style="margin:0">Für diese Kundin ist keine E-Mail-Adresse hinterlegt.</p>'}
       <div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button><button class="btn primary" data-act="erkl-send" data-bid="${r.id}" data-name="${esc(name)}" data-kunde="${k.id}">Kopie senden (Mail)</button></div>`);
    }catch(e){console.error(e);btn.disabled=false;btn.textContent='Unterschreiben & speichern';toast('Speichern fehlgeschlagen.',4000)}
    return false},
+ async wlan(f){const k=kundeById(f.dataset.kunde);if(!k)return false;const v=Object.fromEntries(new FormData(f));
+   if(!v.ok){toast('Bitte das Häkchen setzen lassen.');return false}if(!sig.drawn){toast('Bitte unterschreiben lassen.',3500);return false}
+   if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return false}
+   const btn=f.querySelector('button.primary');btn.disabled=true;const d=today();
+   try{const pdf=erklaerungPDF(k,{datum:d},{typ:'wlan'},sigJpeg());const r=await assets.upload(pdf,{type:'application/pdf'});
+     const name='WLAN_'+(kundeName(k)||'Gast').replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,'_')+'_'+d+'.pdf';
+     await mutate('kunden/'+k.id,x=>({...x,wlan:d,erklaerungen:[...(x.erklaerungen||[]),{id:uid(),typ:'wlan',datum:d,pdf:r.id,name}]}));
+     const s=S.settings;openModal('WLAN freigegeben',`${s.wlanSsid?`<div class="card stat"><span class="label">WLAN</span><b>${esc(s.wlanSsid)}</b>${s.wlanPw?`<span>Passwort: <b class="num">${esc(s.wlanPw)}</b></span>`:''}</div>`:'<p class="small muted" style="margin:0">Tipp: WLAN-Name und Passwort unter Mehr → Einstellungen eintragen, dann stehen sie hier und im PDF.</p>'}
+      <div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button><button class="btn primary" data-act="erkl-send" data-bid="${r.id}" data-name="${esc(name)}" data-kunde="${k.id}">Kopie senden (Mail)</button></div>`);
+   }catch(e){console.error(e);btn.disabled=false;toast('Speichern fehlgeschlagen.',4000)}return false},
  async atest(f){const k=kundeById(f.dataset.kunde);const v=Object.fromEntries(new FormData(f));if(!v.datum){toast('Bitte ein Datum eingeben.');return false}
    await mutate('kunden/'+k.id,x=>({...x,allergietest:{datum:v.datum,ergebnis:v.ergebnis,produkt:(v.produkt||'').trim(),notiz:(v.notiz||'').trim()},allergietests:[...(x.allergietests||[]),{datum:v.datum,ergebnis:v.ergebnis,produkt:(v.produkt||'').trim(),notiz:(v.notiz||'').trim()}]}));
    toast(v.ergebnis==='reaktion'?'Gespeichert – Reaktion vermerkt, bitte nicht färben!':'Allergietest gespeichert',4000)},
@@ -1365,7 +1376,7 @@ const waLink=(tel,text)=>{const n=telWa(tel);return n?`https://wa.me/${n}?text=$
 const waBtn=(tel,text,attrs='',label='WhatsApp')=>{const l=waLink(tel,text);return l?`<a class="btn sm ok" href="${l}" target="_blank" rel="noopener" ${attrs}>${label}</a>`:'<span class="small muted">keine Handynummer</span>'};
 const tageSeit=d=>Math.round((parseDate(today())-parseDate(d))/864e5);
 function alterVon(g){if(!g)return null;const b=parseDate(g),t=parseDate(today());let a=t.getFullYear()-b.getFullYear();if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))a--;return a}
-const letzteErkl=k=>(k.erklaerungen||[]).slice().sort((a,b)=>a.datum<b.datum?1:-1)[0];
+const letzteErkl=k=>(k.erklaerungen||[]).filter(e=>e.typ!=='wlan').slice().sort((a,b)=>a.datum<b.datum?1:-1)[0];
 function gesundheit(k){const w=[];if(!k)return w;const an=k.anamnese,at=k.allergietest;
   if(an&&(an.reaktion||an.henna||an.kopfhaut||an.allergien))w.push({cls:'bad',txt:'Achtung: '+[an.reaktion&&'frühere Reaktion auf Haarfarbe',an.henna&&'Tattoo mit schwarzem Henna',an.kopfhaut&&'Kopfhaut verletzt / Ekzem',an.allergien&&'Allergien'].filter(Boolean).join(', ')+(an.text?' – '+an.text:'')});
   if(at&&at.ergebnis==='reaktion')w.push({cls:'bad',txt:'Allergietest vom '+fmtDate(at.datum)+': REAKTION – nicht mit diesem Produkt färben'+(at.produkt?' ('+at.produkt+')':'')});
@@ -1382,12 +1393,12 @@ function vbWarn(a){if(!a||a.kategorie!=='Haarfarbe')return;const f=$('form[data-
   if(bad.length)toast('⚠ '+bad[0].txt,6000);else if(w.length)toast('Hinweis: '+w[0].txt,4500)}
 function gesundheitCard(k){const w=gesundheit(k);const an=k.anamnese,at=k.allergietest;const erk=(k.erklaerungen||[]).slice().sort((a,b)=>a.datum<b.datum?1:-1);
   const ATL={ok:'unauffällig',reaktion:'REAKTION',abgelehnt:'abgelehnt'};
-  return `<div class="card" style="margin-top:16px"><div class="view-head" style="margin-bottom:8px"><h3 style="margin:0">Gesundheit & Einverständnis</h3><div class="actions"><button class="btn primary sm" data-act="erkl-neu" data-id="${k.id}">Fragebogen & Unterschrift</button><button class="btn sm" data-act="atest" data-id="${k.id}">Allergietest eintragen</button></div></div>
+  return `<div class="card" style="margin-top:16px"><div class="view-head" style="margin-bottom:8px"><h3 style="margin:0">Gesundheit & Formulare</h3><div class="actions"><button class="btn primary sm" data-act="erkl-neu" data-id="${k.id}">Fragebogen & Unterschrift</button><button class="btn sm" data-act="atest" data-id="${k.id}">Allergietest eintragen</button><button class="btn sm" data-act="wlan-neu" data-id="${k.id}">Gäste-WLAN</button></div></div>
    ${w.length?warnBox(k):'<span class="pill ok">Alles aktuell</span>'}
    <div class="grid g3" style="gap:10px;margin-top:10px"><div><div class="label">Gesundheitsfragen</div><b>${an&&an.datum?fmtDate(an.datum):'–'}</b></div>
     <div><div class="label">Allergietest</div><b>${at&&at.datum?fmtDate(at.datum)+' · '+(ATL[at.ergebnis]||''):'–'}</b>${at&&at.produkt?`<div class="small muted">${esc(at.produkt)}</div>`:''}</div>
     <div><div class="label">Gäste-WLAN</div><b>${k.wlan?'Bedingungen akzeptiert '+fmtDate(k.wlan):'–'}</b></div></div>
-   ${erk.length?`<div class="list" style="margin-top:8px">${erk.map(e=>`<div class="row"><div class="grow"><div class="title">Einverständniserklärung</div><div class="small muted">unterschrieben am ${fmtDate(e.datum)}</div></div><a class="btn sm" href="#" data-bid-open="${e.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${e.pdf}" data-name="${esc(e.name||'Einverstaendnis.pdf')}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
+   ${erk.length?`<div class="list" style="margin-top:8px">${erk.map(e=>`<div class="row"><div class="grow"><div class="title">${e.typ==='wlan'?'WLAN-Nutzungsbedingungen':'Gesundheitsfragen & Einverständnis'}</div><div class="small muted">unterschrieben am ${fmtDate(e.datum)}</div></div><a class="btn sm" href="#" data-bid-open="${e.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${e.pdf}" data-name="${esc(e.name||'Einverstaendnis.pdf')}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
    ${(k.quittungen||[]).length?`<div class="label" style="margin-top:12px">Quittungen</div><div class="list">${k.quittungen.slice().reverse().map(q=>`<div class="row"><div class="grow"><div class="title">${esc(q.nr)}</div><div class="small muted">${fmtDate(q.datum)}</div></div><span class="num">${eur(q.betrag)}</span><a class="btn sm" href="#" data-bid-open="${q.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${q.pdf}" data-name="${esc(q.name)}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
   </div>`}
 const RECHT_HAAR='Oxidative Haarfärbemittel können schwere allergische Reaktionen hervorrufen. Sie sind nicht für Personen unter 16 Jahren bestimmt. Temporäre Tätowierungen mit "schwarzem Henna" können das Allergierisiko erhöhen (Pflicht-Warnhinweise nach Verordnung (EG) Nr. 1223/2009, Anhang III). Die Hersteller empfehlen vor jeder Färbung einen Hautverträglichkeitstest (Allergietest), der 48 Stunden vor der Anwendung durchgeführt wird.';
@@ -1405,11 +1416,17 @@ function erklaerungForm(k){if(!k)return;const an=k.anamnese||{};
    <div class="legaltxt">${esc(RECHT_HAAR)} ${esc(RECHT_BESTAET)}</div>
    <div class="field"><span class="label">2. Datenschutz</span><div class="legaltxt">${esc(datenschutzText())}</div><label class="check"><input type="checkbox" name="datenschutz"><span>Ich habe die Datenschutzhinweise gelesen und willige ein, dass meine Angaben zu Allergien und Verträglichkeit gespeichert werden.</span></label></div>
    <div class="field"><span class="label">3. Fotos</span><label class="check"><input type="checkbox" name="foto" ${k.fotoEinwilligung?'checked':''}><span>${esc(FOTO_TEXT)}</span></label></div>
-   <div class="field"><span class="label">4. Gäste-WLAN</span><div class="legaltxt">${esc(wlanText())}</div><label class="check"><input type="checkbox" name="wlan" ${k.wlan?'checked':''}><span>Ich möchte das Gäste-WLAN nutzen und akzeptiere die Nutzungsbedingungen.</span></label></div>
    <div class="field"><span class="label">Unterschrift Kundin / Kunde</span><canvas id="sigpad" class="sigpad" aria-label="Unterschriftsfeld"></canvas><div style="display:flex;justify-content:space-between;align-items:center"><span class="small muted">${esc(S.settings.adresse?String(S.settings.adresse).split(',').pop().trim():'')}, ${fmtDate(today())}</span><button type="button" class="btn sm" data-act="sig-clear">Unterschrift löschen</button></div></div>
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Unterschreiben & speichern</button></div></form>`,
   {wide:true,onMount:m=>sigInit($('#sigpad',m))});
 }
+function wlanForm(k){if(!k)return;
+  openModal('Gäste-WLAN – '+kundeName(k),`<form data-form="wlan" data-kunde="${k.id}" class="grid" style="gap:14px">
+   <div class="field"><span class="label">Nutzungsbedingungen</span><div class="legaltxt" style="max-height:none">${esc(wlanText())}</div></div>
+   <label class="check"><input type="checkbox" name="ok"><span>Ich habe die Nutzungsbedingungen gelesen und akzeptiere sie.</span></label>
+   <div class="field"><span class="label">Unterschrift Gast</span><canvas id="sigpad" class="sigpad" aria-label="Unterschriftsfeld"></canvas><div style="display:flex;justify-content:flex-end"><button type="button" class="btn sm" data-act="sig-clear">Unterschrift löschen</button></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Unterschreiben & WLAN freigeben</button></div></form>`,
+  {wide:true,onMount:m=>sigInit($('#sigpad',m))})}
 function sigInit(c){sig={drawn:false,c};const r=c.getBoundingClientRect();const dpr=window.devicePixelRatio||1;c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);
   const x=c.getContext('2d');x.scale(dpr,dpr);x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#111';x.fillStyle='#fff';x.fillRect(0,0,r.width,r.height);
   let down=false,lx=0,ly=0;const pos=e=>{const b=c.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top]};
@@ -1418,27 +1435,27 @@ function sigInit(c){sig={drawn:false,c};const r=c.getBoundingClientRect();const 
   const up=()=>{down=false};c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up)}
 function sigJpeg(){const c=sig.c;const w=600,h=Math.round(600*c.height/c.width);const o=document.createElement('canvas');o.width=w;o.height=h;const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(c,0,0,w,h);return o.toDataURL('image/jpeg',.85)}
 function sigClear(){const c=sig.c;if(!c)return;const x=c.getContext('2d');x.save();x.setTransform(1,0,0,1,0,0);x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.restore();sig.drawn=false}
-function erklaerungPDF(k,an,opt,sigUrl){const doc=newPdf({unit:'mm',format:'a4'});const s=S.settings;const x=18,W=210,maxW=W-2*x;let y=18;
+function erklaerungPDF(k,an,opt,sigUrl){const wl=opt.typ==='wlan';const doc=newPdf({unit:'mm',format:'a4'});const s=S.settings;const x=18,W=210,maxW=W-2*x;let y=18;
   const need=h=>{if(y+h>282){doc.addPage();y=18}};
   const para=(t,size=9.5,style='normal',gap=2)=>{doc.setFont('helvetica',style);doc.setFontSize(size);const L=doc.splitTextToSize(String(t).replace(/[„“]/g,'"'),maxW);L.forEach(l=>{need(size*.45);doc.text(l,x,y);y+=size*.45});y+=gap};
   const head=t=>{y+=1;need(12);para(t,11,'bold',0.5)};
   doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(s.firma||'SEEN Salon',x,y);y+=6;doc.setFont('helvetica','normal');doc.setFontSize(9);
   [s.inhaber,s.adresse,[s.telefon?'Tel. '+s.telefon:'',s.email].filter(Boolean).join(' · ')].filter(Boolean).forEach(l=>{doc.text(l,x,y);y+=4.3});y+=5;
-  para('Gesundheitsfragen und Einverständniserklärung',14,'bold',1);
-  para('Kundin / Kunde: '+kundeName(k)+(k.geburtstag?'   ·   geboren am '+fmtDate(k.geburtstag):'')+'   ·   Datum: '+fmtDate(an.datum),10,'normal',3);
+  para(wl?'Nutzungsbedingungen Gäste-WLAN':'Gesundheitsfragen und Einverständniserklärung',14,'bold',1);
+  para((wl?'Gast: ':'Kundin / Kunde: ')+kundeName(k)+(k.geburtstag&&!wl?'   ·   geboren am '+fmtDate(k.geburtstag):'')+'   ·   Datum: '+fmtDate(an.datum),10,'normal',3);
+  if(wl){para(wlanText(),9.3,'normal',2);para('[X] Ich habe die Nutzungsbedingungen gelesen und akzeptiere sie.',9.5,'normal',2);if(s.wlanSsid)para('WLAN: '+s.wlanSsid+(s.wlanPw?'   ·   Passwort: '+s.wlanPw:''),10,'bold',3)}
+  else{
   head('1. Gesundheitsfragen');FRAGEN.forEach(([n,q])=>{para((an[n]?'[X] JA    ':'[ ] nein  ')+'  '+q.replace(/[„“]/g,'"'),9.5,'normal',1)});
   if(an.text)para('Allergien / Anmerkungen: '+an.text,9.5,'normal',2);
   para(RECHT_HAAR,8.3,'normal',1.2);para(RECHT_BESTAET,8.3,'normal',1.5);
   head('2. Datenschutz (DSGVO)');para(datenschutzText(),8.3,'normal',1.2);para('[X] Ich habe die Datenschutzhinweise gelesen und willige in die Speicherung meiner Angaben zu Allergien und Verträglichkeit ein.',9.5,'normal',2);
-  head('3. Fotos');para((opt.foto?'[X] ':'[ ] ')+FOTO_TEXT,9,'normal',2);
-  head('4. Nutzungsbedingungen Gäste-WLAN');para(wlanText(),8.3,'normal',1.2);para((opt.wlan?'[X] Ich möchte das Gäste-WLAN nutzen und akzeptiere die Nutzungsbedingungen.':'[ ] Gäste-WLAN wird nicht genutzt.'),9.5,'normal',2);
-  if(opt.wlan&&s.wlanSsid)para('WLAN: '+s.wlanSsid+(s.wlanPw?'   ·   Passwort: '+s.wlanPw:''),9.5,'bold',2);
+  head('3. Fotos');para((opt.foto?'[X] ':'[ ] ')+FOTO_TEXT,9,'normal',2);}
   need(40);y+=2;const city=s.adresse?String(s.adresse).split(',').pop().trim():'';
   try{doc.addImage(sigUrl,'JPEG',x+95,y,70,28)}catch(e){}
   doc.setDrawColor(120);doc.line(x,y+29,x+80,y+29);doc.line(x+95,y+29,W-x,y+29);
   doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text((city?city+', ':'')+fmtDate(an.datum),x,y+27);
-  doc.setFontSize(8);doc.text('Ort, Datum',x,y+33);doc.text('Unterschrift Kundin / Kunde',x+95,y+33);y+=39;
-  doc.setFontSize(7.5);doc.setTextColor(120);doc.text('Diese Erklärung gilt 12 Monate. Erstellt mit SEEN Salon am '+fmtDate(today())+'.',x,Math.min(y,288));
+  doc.setFontSize(8);doc.text('Ort, Datum',x,y+33);doc.text(wl?'Unterschrift Gast':'Unterschrift Kundin / Kunde',x+95,y+33);y+=39;
+  doc.setFontSize(7.5);doc.setTextColor(120);doc.text((wl?'':'Diese Erklärung gilt 12 Monate. ')+'Erstellt mit SEEN Salon am '+fmtDate(today())+'.',x,Math.min(y,288));
   return doc.output('blob')}
 function allergieTestForm(k){if(!k)return;const at=k.allergietest||{};const hist=(k.allergietests||[]).slice().reverse();const ATL={ok:'unauffällig',reaktion:'Reaktion',abgelehnt:'abgelehnt'};
   openModal('Allergietest – '+kundeName(k),`<form data-form="atest" data-kunde="${k.id}" class="grid" style="gap:12px">
