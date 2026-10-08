@@ -1,5 +1,4 @@
-ARG BUILD_FROM=couchdb:3.5.2
-FROM ${BUILD_FROM}
+FROM docker.io/library/couchdb:3.5.2
 ARG BUILD_ARCH=amd64
 ARG TS_VERSION=1.104.1
 RUN set -eux; \
