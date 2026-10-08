@@ -706,7 +706,7 @@ function kundeForm(k={}){
    ${fld('vorname','Vorname',k.vorname)}${fld('nachname','Nachname',k.nachname)}${fld('telefon','Telefon',k.telefon,'tel')}${fld('email','E-Mail',k.email,'email')}${fld('geburtstag','Geburtstag',k.geburtstag,'date')}${fld('adresse','Anschrift (für Rechnungen über 250 €)',k.adresse)}</div>
    <div class="field"><label for="f-notiz">Notizen (Haartyp, Wünsche, Unverträglichkeiten)</label><textarea id="f-notiz" name="notiz">${esc(k.notiz||'')}</textarea></div>
    <label class="check"><input type="checkbox" name="fotoEinwilligung" ${k.fotoEinwilligung?'checked':''}><span>Die Kundin / der Kunde ist einverstanden, dass Vorher-/Nachher-Fotos zur Dokumentation gespeichert werden (DSGVO-Einwilligung).</span></label>
-   <label class="check"><input type="checkbox" name="fotoSchutz" ${k.fotoSchutz?'checked':''}><span><b>Fotos besonders schützen</b> (z. B. Kundin mit Kopftuch / aus religiösen Gründen): Die Fotos sind verdeckt und erscheinen erst nach Eingabe der PIN.</span></label>
+   <label class="check"><input type="checkbox" name="fotoSchutz" ${k.fotoSchutz?'checked':''}><span><b>Fotos besonders schützen</b> (z. B. Kundin mit Kopftuch / aus religiösen Gründen): Die Fotos sind verdeckt, erscheinen erst nach Eingabe der PIN und verlassen nie das iPad – kein OneDrive, keine Sicherungsdatei.</span></label>
    <div class="notice info small">Info für alle Kundinnen: Fotos bleiben nur auf diesem iPad (und in der verschlüsselten Sicherung) und werden nicht weitergegeben. Für Werbung auf Instagram braucht es eine eigene, unterschriebene Einwilligung.</div>
    <div class="modal-foot">${k.id?'<button type="button" class="btn danger" data-act="kunde-del" data-id="'+k.id+'" style="margin-right:auto">Kundenkarte löschen</button>':''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
 }
@@ -1450,12 +1450,13 @@ function erklaerungForm(k){if(!k)return;const an=k.anamnese||{};
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Unterschreiben & speichern</button></div></form>`,
   {wide:true,onMount:m=>sigInit($('#sigpad',m))});
 }
+function geschuetzteFotos(){const ks=new Set(S.kunden.filter(k=>k.fotoSchutz).map(k=>k.id));return new Set(S.besuche.filter(b=>ks.has(b.kundeId)).flatMap(b=>b.fotos||[]))}
 function fotoFrei(k){return !k.fotoSchutz||(UI.fotoFrei&&UI.fotoFrei.id===k.id&&Date.now()<UI.fotoFrei.until)}
 function fotoFreiForm(id){openModal('Geschützte Fotos anzeigen',`<form data-form="fotofrei" data-id="${id}" class="grid" style="gap:12px"><p class="small muted" style="margin:0">Diese Fotos sind besonders geschützt. Bitte PIN eingeben – die Fotos sind dann 5 Minuten sichtbar.</p>
    <input type="password" name="pin" inputmode="numeric" autocomplete="off" placeholder="PIN" style="font-size:1.4rem;text-align:center;letter-spacing:.4em" aria-label="PIN">
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Anzeigen</button></div></form>`,{onMount:m=>setTimeout(()=>m.querySelector('[name=pin]').focus(),50)})}
 function fotoGalerie(k,besuche){const L=besuche.filter(b=>(b.fotos||[]).length);const n=L.reduce((a,b)=>a+b.fotos.length,0);const frei=fotoFrei(k);
-  const head=`<div class="view-head" style="margin-bottom:10px"><div><h2 style="margin:0">Fotos – ${esc(kundeName(k))}</h2><div class="small muted">${n} Fotos aus ${L.length} Besuchen · bleiben nur auf diesem iPad</div></div><div class="actions">${k.fotoSchutz&&frei?'<button class="btn sm" data-act="foto-sperren">🔒 Wieder verdecken</button>':''}${n&&frei?`<button class="btn sm" data-act="foto-onedrive" data-id="${k.id}">In OneDrive sichern</button>`:''}<button class="btn sm" data-act="foto-ansehen">Aus OneDrive ansehen</button></div></div>`;
+  const head=`<div class="view-head" style="margin-bottom:10px"><div><h2 style="margin:0">Fotos – ${esc(kundeName(k))}</h2><div class="small muted">${n} Fotos aus ${L.length} Besuchen · ${k.fotoSchutz?'<b>geschützt: nur auf diesem iPad – nie in OneDrive oder in der Sicherung</b>':'bleiben nur auf diesem iPad'}</div></div><div class="actions">${k.fotoSchutz&&frei?'<button class="btn sm" data-act="foto-sperren">🔒 Wieder verdecken</button>':''}${k.fotoSchutz?'':`${n?`<button class="btn sm" data-act="foto-onedrive" data-id="${k.id}">In OneDrive sichern</button>`:''}<button class="btn sm" data-act="foto-ansehen">Aus OneDrive ansehen</button>`}</div></div>`;
   if(!n)return `<div class="card">${head}<div class="empty">Noch keine Fotos. Fotos werden beim Besuch erfasst (+ Besuch).</div></div>`;
   if(!frei)return `<div class="card">${head}<div class="lockbox" style="padding:24px;justify-content:center">🔒 ${n} geschützte Fotos <button class="btn primary" data-act="foto-frei" data-id="${k.id}">Mit PIN anzeigen</button></div></div>`;
   return `<div class="card">${head}${L.map(b=>`<div style="margin-top:12px"><div class="label">${fmtDate(b.datum)}${(b.leistungen||[]).length?' · '+esc(b.leistungen.join(', ')):''}</div><div class="gal" style="margin-top:6px">${b.fotos.map(id=>`<div><img data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy"></div>`).join('')}</div>${b.rezeptur?`<div class="recipe" style="margin-top:6px">${esc(b.rezeptur)}</div>`:''}</div>`).join('')}</div>`}
@@ -1464,8 +1465,8 @@ async function fotosExport(id){const k=kundeById(id);if(!k)return;const L=S.besu
     if(!files.length){toast('Keine Fotos gefunden.');return}
     try{if(navigator.canShare&&navigator.canShare({files})){await navigator.share({files,title:'Fotos '+kundeName(k)});return}}catch(e){if(e&&e.name==='AbortError')return}
     for(const f of files)await saveFile(f.name,f)};
-  if(k.fotoSchutz)confirmBox('Geschützte Fotos','Diese Kundin hat besonderen Fotoschutz. Die Kopien in OneDrive sind dort nicht verschlüsselt. Nur in einen privaten Ordner speichern (z. B. OneDrive › Salon-Fotos › '+base+').','Trotzdem sichern',go);
-  else{toast('Im Teilen-Menü „In Dateien sichern“ → OneDrive › Salon-Fotos › '+base+' wählen.',5000);await go()}}
+  if(k.fotoSchutz){toast('Geschützte Fotos werden nicht in OneDrive gespeichert.',4000);return}
+  {toast('Im Teilen-Menü „In Dateien sichern“ → OneDrive › Salon-Fotos › '+base+' wählen.',5000);await go()}}
 $('#foto-view-input').addEventListener('change',ev=>{const fs=[...(ev.target.files||[])];if(!fs.length)return;const urls=fs.map(f=>URL.createObjectURL(f));
   openModal('Fotos aus OneDrive (nur ansehen)',`<p class="small muted" style="margin:0">Die Fotos werden nur angezeigt und nicht auf dem iPad gespeichert.</p><div class="gal">${urls.map((u,i)=>`<div><img src="${u}" alt="Foto ${i+1}"><div class="cap">${esc(fs[i].name)}</div></div>`).join('')}</div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Schließen</button></div>`,{wide:true});
   setTimeout(()=>urls.forEach(u=>{}),0)});
@@ -1672,8 +1673,8 @@ async function aesKey(pw,salt){const k=await crypto.subtle.importKey('raw',new T
 async function sicherungErstellen(alleFotos){
   const last=alleFotos?0:(await IDB.get('meta','lastBackupTs'))||0;const now=Date.now();
   const docs=[...LocalDB.cache].map(([path,data])=>({path,data}));
-  const keys=await IDB.keys('blobs');const blobs=[];
-  for(const id of keys){const r=await IDB.get('blobs',id);if(!r||r.ts<=last)continue;blobs.push({id,type:r.type,ts:r.ts,data:b64(await r.blob.arrayBuffer())})}
+  const keys=await IDB.keys('blobs');const blobs=[];const geschuetzt=geschuetzteFotos();
+  for(const id of keys){if(geschuetzt.has(id))continue;const r=await IDB.get('blobs',id);if(!r||r.ts<=last)continue;blobs.push({id,type:r.type,ts:r.ts,data:b64(await r.blob.arrayBuffer())})}
   let out={app:'SEEN Salon',v:1,erstellt:new Date(now).toISOString(),fotosAb:last,vollstaendig:!!alleFotos||!last,docs,blobs};
   let json=JSON.stringify(out);const pw=await IDB.get('meta','backupPw');
   if(pw){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
