@@ -5,6 +5,7 @@ Eigene Datenbank für die SEEN-Salon-App. Damit sehen iPad und Handy dieselben D
 - Die Daten liegen **nur hier auf diesem Rechner** (CouchDB), nicht in einer fremden Cloud.
 - Erreichbar ist die Datenbank **nur über Tailscale** (eigener Tailscale-Knoten „seen-db“ mit HTTPS-Zertifikat). Sie wird **nicht** ins Internet freigegeben und hängt nicht am Funnel von Home Assistant.
 - Fotos von besonders geschützten Kundinnen werden von der App nie hierher übertragen.
+- Die Salon-Daten sind **von den Home-Assistant-Sicherungen ausgeschlossen**. Gesichert wird über die verschlüsselte Tagessicherung der App.
 
 ## Einrichtung
 
