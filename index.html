@@ -231,6 +231,7 @@ a.btn{text-decoration:none}
 <nav class="tabs" aria-label="Bereiche"><div class="in" id="nav"></div></nav>
 <div id="scan-reader"></div>
 <input type="file" id="scan-input" accept="image/*" capture="environment" hidden>
+<input type="file" id="ics-input" accept=".ics,text/calendar" hidden>
 <input type="file" id="foto-view-input" accept="image/*" multiple hidden>
 <input type="file" id="art-foto-input" accept="image/*" capture="environment" hidden>
 <input type="file" id="beleg-input" accept="image/*,application/pdf" multiple hidden>
@@ -519,6 +520,8 @@ mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px"
    <h3 style="margin-top:18px">Privatkalender (Outlook / iPad)</h3>
    <div class="field"><label for="f-icsUrl">ICS-Link des Outlook-Kalenders (Outlook.com → Einstellungen → Kalender → Freigegebene Kalender → Kalender veröffentlichen → ICS)</label><input id="f-icsUrl" name="icsUrl" type="url" value="${esc(s.icsUrl||'')}" placeholder="https://outlook.live.com/owa/calendar/…/calendar.ics" autocomplete="off"></div>
    <div class="small muted" id="ics-status">${icsStatusText()}</div>
+   <div class="actions" style="margin-top:6px"><button type="button" class="btn sm" data-act="ics-jetzt">Jetzt aktualisieren</button><button type="button" class="btn sm" data-act="ics-datei">Kalenderdatei (.ics) importieren</button></div>
+   <p class="small muted" style="margin:4px 0 0">Falls der Link nicht direkt gelesen werden kann: den ICS-Link einmal in Safari öffnen → Datei wird in „Dateien“ gespeichert → hier „Kalenderdatei importieren“ tippen.</p>
    <h3 style="margin-top:18px">Ruhetage (Salon geschlossen)</h3><div class="chips">${[1,2,3,4,5,6,0].map(i=>`<label class="chip" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="ruhetag" value="${i}" ${ruhetage().includes(i)?'checked':''} style="accent-color:var(--accent)">${WD[i]}</label>`).join('')}</div>
    <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
   <div class="card"><h3>Speicherplatz für Fotos</h3><div id="storage-info" class="small muted">Wird gelesen …</div></div>
@@ -1013,6 +1016,8 @@ const ACT={
  'scan-lager':()=>startScan(lookupEan),
  'art-foto':el=>{artFotoZiel=el.dataset.id;const i=$('#art-foto-input');i.value='';i.click()},
  'erkl-neu':el=>erklaerungForm(kundeById(el.dataset.id)),
+ 'ics-jetzt':()=>{if(!S.settings.icsUrl){toast('Bitte zuerst den ICS-Link eintragen und speichern.');return}ICS.datei=false;icsLaden(true)},
+ 'ics-datei':()=>{const i=$('#ics-input');i.value='';i.click()},
  'werbung-neu':el=>werbungForm(kundeById(el.dataset.id)),
  'werbung-widerruf':el=>{const k=kundeById(el.dataset.id);confirmBox('Werbe-Einwilligung widerrufen','Die Kundin widerruft die Einwilligung für Instagram/Werbung. Bereits veröffentlichte Beiträge bitte selbst löschen.','Widerrufen',async()=>{await mutate('kunden/'+k.id,x=>({...x,werbung:'',werbungKanaele:'',erklaerungen:[...(x.erklaerungen||[]),{id:uid(),typ:'werbung-widerruf',datum:today(),pdf:'',name:''}]}));toast('Widerruf gespeichert')})},
  'kunde-tab':el=>{UI.kundeTab=el.dataset.v;renderBody()},
@@ -1484,6 +1489,7 @@ async function fotosExport(id){const k=kundeById(id);if(!k)return;const L=S.besu
     for(const f of files)await saveFile(f.name,f)};
   if(k.fotoSchutz){toast('Geschützte Fotos werden nicht in OneDrive gespeichert.',4000);return}
   {toast('Im Teilen-Menü „In Dateien sichern“ → OneDrive › Salon-Fotos › '+base+' wählen.',5000);await go()}}
+$('#ics-input').addEventListener('change',ev=>{const f=ev.target.files&&ev.target.files[0];if(f)icsDateiImport(f)});
 $('#foto-view-input').addEventListener('change',ev=>{const fs=[...(ev.target.files||[])];if(!fs.length)return;const urls=fs.map(f=>URL.createObjectURL(f));
   openModal('Fotos aus OneDrive (nur ansehen)',`<p class="small muted" style="margin:0">Die Fotos werden nur angezeigt und nicht auf dem iPad gespeichert.</p><div class="gal">${urls.map((u,i)=>`<div><img src="${u}" alt="Foto ${i+1}"><div class="cap">${esc(fs[i].name)}</div></div>`).join('')}</div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Schließen</button></div>`,{wide:true});
   setTimeout(()=>urls.forEach(u=>{}),0)});
@@ -1602,8 +1608,12 @@ function quittungForm(kid){const k=kundeById(kid);const L=leistungen();
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Quittung erstellen</button></div></form>`)}
 
 /* ================= Privatkalender (ICS, nur lesen) ================= */
-const ICS={events:[],ts:0,err:'',loading:false};
-function icsStatusText(){if(!S.settings||!S.settings.icsUrl)return 'Kein Privatkalender verbunden.';if(ICS.err)return '⚠ '+ICS.err;if(ICS.ts)return '✓ '+ICS.events.length+' private Termine geladen, Stand '+new Date(ICS.ts).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});return 'Wird geladen …'}
+const ICS={events:[],ts:0,err:'',loading:false,datei:false};
+async function icsDateiImport(file){try{const txt=await file.text();if(!/BEGIN:VCALENDAR/.test(txt)){toast('Das ist keine Kalenderdatei (.ics).',4000);return}
+  ICS.events=icsParse(txt,addDays(today(),-14),addDays(today(),120));ICS.ts=Date.now();ICS.err='';ICS.datei=true;
+  if(S.settings.icsUrl)await mutate('settings/main',d=>({...d,icsUrl:''}));
+  await IDB.put('meta','icsCache',{url:'datei',ts:ICS.ts,events:ICS.events});toast(ICS.events.length+' private Termine importiert',3500);renderBody();const st=$('#ics-status');if(st)st.textContent=icsStatusText()}catch(e){console.error(e);toast('Datei konnte nicht gelesen werden.',4000)}}
+function icsStatusText(){if(ICS.datei&&ICS.ts&&!ICS.err)return '✓ '+ICS.events.length+' private Termine aus Datei, importiert '+new Date(ICS.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});if(!S.settings||!S.settings.icsUrl)return 'Kein Privatkalender verbunden.';if(ICS.err)return '⚠ '+ICS.err;if(ICS.ts)return '✓ '+ICS.events.length+' private Termine geladen, Stand '+new Date(ICS.ts).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});return 'Wird geladen …'}
 function icsUnfold(t){return t.replace(/\r\n[ \t]/g,'').replace(/\n[ \t]/g,'')}
 function icsVal(s){return s.replace(/\\n/gi,' ').replace(/\\,/g,',').replace(/\;/g,';').replace(/\\\\/g,'\\')}
 function icsDate(v,params){const allday=/VALUE=DATE(?!-)/.test(params)||/^\d{8}$/.test(v);const m=v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);if(!m)return null;
@@ -1632,7 +1642,7 @@ function icsExpand(ev,von,bis,out){if(ev.status==='CANCELLED')return;const s=ev.
   else if(R.FREQ==='YEARLY'){for(let i=0;i<200;i++){const d=new Date(s);d.setFullYear(s.getFullYear()+i*iv);if(stop(d))return;n++;push(d)}}
   else push(s)}
 function extTermine(ds){return ICS.events.filter(e=>e.datum===ds)}
-async function icsLaden(force){const url=S.settings&&S.settings.icsUrl;if(!url){ICS.events=[];ICS.err='';return}
+async function icsLaden(force){const url=S.settings&&S.settings.icsUrl;if(!url){if(!ICS.ts){const c=await IDB.get('meta','icsCache').catch(()=>null);if(c&&c.url==='datei'){ICS.events=c.events;ICS.ts=c.ts;ICS.datei=true;renderBody()}}return}
   if(!ICS.ts){const c=await IDB.get('meta','icsCache').catch(()=>null);if(c&&c.url===url){ICS.events=c.events;ICS.ts=c.ts;renderBody()}}
   if(ICS.loading||(!force&&Date.now()-ICS.ts<10*60000)||!navigator.onLine)return;ICS.loading=true;
   try{const u=url.replace(/^webcals?:\/\//i,'https://');const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const txt=await r.text();if(!/BEGIN:VCALENDAR/.test(txt))throw new Error('keine Kalenderdatei');
