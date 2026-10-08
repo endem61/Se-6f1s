@@ -1,0 +1,21 @@
+name: SEEN Datenbank
+version: "1.0.0"
+slug: seen_db
+description: Eigene Datenbank (CouchDB) für die SEEN-Salon-App – nur über Tailscale erreichbar, keine Daten in fremden Clouds
+url: https://github.com/endem61/Se-6f1s/tree/main/seen-db
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: services
+boot: auto
+options:
+  couch_user: seen
+  couch_password: ""
+  tailscale_authkey: ""
+  tailscale_hostname: seen-db
+schema:
+  couch_user: str
+  couch_password: password
+  tailscale_authkey: password?
+  tailscale_hostname: str
