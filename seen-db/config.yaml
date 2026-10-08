@@ -1,5 +1,5 @@
 name: SEEN Datenbank
-version: "1.0.1"
+version: "1.0.2"
 slug: seen_db
 description: Eigene Datenbank (CouchDB) für die SEEN-Salon-App – nur über Tailscale erreichbar, keine Daten in fremden Clouds
 url: https://github.com/endem61/Se-6f1s/tree/main/seen-db
