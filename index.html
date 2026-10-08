@@ -162,6 +162,11 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 .pos #f-betrag{font-size:2rem;font-weight:700;min-height:64px;font-variant-numeric:tabular-nums}
 .pos-go{width:100%;min-height:60px;font-size:1.15rem}
 .notice.ok{background:var(--ok-soft)}
+.sigpad{width:100%;height:190px;border:1.5px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;display:block}
+.legaltxt{font-size:.82rem;line-height:1.45;color:var(--muted);background:var(--surface2);border-radius:10px;padding:10px 12px;max-height:180px;overflow:auto}
+.stat-tbl td,.stat-tbl th{padding:6px 8px;font-size:.85rem;white-space:nowrap}
+.warnlist{display:grid;gap:6px}
+a.btn{text-decoration:none}
 .big-in{font-size:1.6rem!important;font-weight:700;min-height:60px!important;font-variant-numeric:tabular-nums}
 .pos-display{background:var(--surface2);border-radius:14px;padding:14px 18px;text-align:right}
 #pos-amount{font-size:3rem;font-weight:700;line-height:1.1;letter-spacing:-.02em}
@@ -414,13 +419,13 @@ function loadingOr(fn){return S.ready?fn():'<div class="empty">Daten werden gela
 
 const SHELL={
  heute:()=>`<div class="view-head"><div><div class="label">${esc(fmtDateLong(today()))}</div><h1>Guten Tag</h1></div>
-   <div class="actions"><button class="btn primary" data-act="termin-neu">+ Termin</button><button class="btn" data-act="kasse-einnahme">Tageseinnahmen</button><button class="btn" data-act="kasse-ausgabe">+ Ausgabe</button><button class="btn" data-act="scan-lager">Barcode scannen</button><button class="btn" data-act="kunde-neu">+ Kunde</button></div></div><div id="body"></div>`,
+   <div class="actions"><button class="btn primary" data-act="termin-neu">+ Termin</button><button class="btn" data-act="kasse-einnahme">Tageseinnahmen</button><button class="btn" data-act="kasse-ausgabe">+ Ausgabe</button><button class="btn" data-act="scan-lager">Barcode scannen</button><button class="btn" data-act="kunde-neu">+ Kunde</button><button class="btn" data-act="q-neu">Quittung</button></div></div><div id="body"></div>`,
  termine:()=>`<div class="view-head"><h1>Termine</h1><div class="actions">
    <button class="btn sm" data-act="t-prev" aria-label="Vorherige Woche">‹ Woche</button><button class="btn sm" data-act="t-heute">Heute</button><button class="btn sm" data-act="t-next" aria-label="Nächste Woche">Woche ›</button>
    <input type="date" id="t-date" value="${UI.terminDatum}" style="width:auto" aria-label="Datum wählen"><button class="btn primary" data-act="termin-neu">+ Termin</button></div></div><div id="body"></div>`,
  kunden:()=>`<div id="body"></div>`,
  lager:()=>`<div class="view-head"><h1>Lager & Inventur</h1><div class="actions">
-   <button class="btn ok" data-act="serie-start" data-k="zugang">+ Wareneingang scannen</button><button class="btn" data-act="serie-start" data-k="verbrauch">− Verbrauch scannen</button><button class="btn" data-act="scan-lager">Artikel per Barcode</button><button class="btn" data-act="artikel-neu">+ Artikel</button><button class="btn" data-act="inventur-csv">Inventurliste (CSV)</button></div></div>
+   <button class="btn ok" data-act="serie-start" data-k="zugang">+ Wareneingang scannen</button><button class="btn" data-act="serie-start" data-k="verbrauch">− Verbrauch scannen</button><button class="btn" data-act="scan-lager">Artikel per Barcode</button><button class="btn" data-act="artikel-neu">+ Artikel</button><button class="btn" data-act="bestellliste">Bestellliste</button><button class="btn" data-act="inventur-csv">Inventurliste (CSV)</button></div></div>
    <div class="fields" style="margin-bottom:14px"><input type="search" id="lager-suche" placeholder="Suchen: Name, Marke, Farbnummer oder EAN" value="${esc(UI.lagerSuche)}" aria-label="Artikel suchen">
    <select id="lager-kat" aria-label="Kategorie"><option value="">Alle Kategorien</option>${ART_KAT.map(k=>`<option ${UI.lagerKat===k?'selected':''}>${k}</option>`).join('')}</select></div><div id="body"></div>`,
  kasse:()=>`<div class="seg" role="group" aria-label="Bereich" style="margin-bottom:16px;flex-wrap:wrap">${[['tag','Einnahmen'],['aus','Ausgaben'],['buch','Kassenbuch'],['belege','Belege'],['euer','EÜR / Jahr'],['abschl','Kassenstürze'],...(isAdmin()?[['fv','Familienvers.']]:[])].map(([k,l])=>`<button data-act="kasse-tab" data-v="${k}" aria-pressed="${UI.kasseTab===k}">${l}</button>`).join('')}</div><div id="body"></div>`,
@@ -449,7 +454,8 @@ heute:()=>loadingOr(()=>{
   ${faelligCard()}
   <div class="grid g2">
    <div class="card"><h3>Termine heute</h3>${termine.length?`<div class="list">${termine.map(apptRow).join('')}</div>`:'<div class="empty">Heute keine Termine.<br><button class="btn sm" data-act="termin-neu" style="margin-top:8px">+ Termin anlegen</button></div>'}</div>
-   <div class="card"><h3>Nachbestellen</h3>${low.length?`<div class="list">${low.map(a=>`<div class="row click" data-act="artikel-open" data-id="${a.id}"><div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">${esc(a.marke||'')} · Mindestbestand ${num(a.minBestand)}</div></div><span class="pill bad">${num(a.bestand)} ${esc(a.einheit||'Stk')}</span></div>`).join('')}</div>`:'<div class="empty">Alle Artikel ausreichend vorrätig.</div>'}</div>
+   ${erinnerungCard()}${geburtstagCard()}
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">Nachbestellen</h3>${low.length?'<button class="btn sm" data-act="bestellliste">Bestellliste senden</button>':''}</div>${low.length?`<div class="list">${low.map(a=>`<div class="row click" data-act="artikel-open" data-id="${a.id}"><div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">${esc(a.marke||'')} · Mindestbestand ${num(a.minBestand)}</div></div><span class="pill bad">${num(a.bestand)} ${esc(a.einheit||'Stk')}</span></div>`).join('')}</div>`:'<div class="empty">Alle Artikel ausreichend vorrätig.</div>'}</div>
    ${mhdList.length?`<div class="card"><h3>Haltbarkeit prüfen</h3><div class="list">${mhdList.map(a=>{const m=mhdInfo(a);return `<div class="row click" data-act="artikel-open" data-id="${a.id}"><div class="grow"><div class="title">${esc(a.name)}</div><div class="small muted">${num(a.bestand)} ${esc(a.einheit||'Stk')} auf Lager</div></div><span class="pill ${m.cls}">${m.txt}</span></div>`}).join('')}</div></div>`:''}
   </div>`;
 }),
@@ -464,14 +470,14 @@ termine:()=>loadingOr(()=>{
     return `<div class="appt ${x.status||''}" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><div class="time">${esc(x.zeit)}</div><div class="grow" style="min-width:0"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${esc(x.leistung||'')} · ${num(x.dauer)||30} Min${x.notiz?' · '+esc(x.notiz):''}</div></div>${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':x.status==='abgesagt'?'<span class="pill">abgesagt</span>':''}</div>`}).join('')}</div>`:`<div class="card empty">Keine Termine an diesem Tag.<br><button class="btn sm" data-act="termin-neu" style="margin-top:8px">+ Termin anlegen</button></div>`);
 }),
 /* ---- Kunden ---- */
-kunden:()=>loadingOr(()=>{
+kunden:()=>loadingOr(()=>{if(UI.kundenStat)return statView();
   const q=UI.kundenSuche.trim().toLowerCase();
   const letzte={};S.besuche.forEach(b=>{if(!letzte[b.kundeId]||b.datum>letzte[b.kundeId])letzte[b.kundeId]=b.datum});
   const list=S.kunden.filter(k=>!q||[k.vorname,k.nachname,k.telefon,k.email].join(' ').toLowerCase().includes(q))
     .sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de')||(a.vorname||'').localeCompare(b.vorname||'','de'));
   const sel=UI.kundeSel&&kundeById(UI.kundeSel);
   return `<div class="split ${sel?'has-sel':''}">
-   <div class="pane-list"><div class="view-head"><h1>Kunden</h1><button class="btn primary" data-act="kunde-neu">+ Kunde</button></div>
+   <div class="pane-list"><div class="view-head"><h1>Kunden</h1><div class="actions"><button class="btn" data-act="stat-open">Auswertung</button><button class="btn primary" data-act="kunde-neu">+ Kunde</button></div></div>
     <input type="search" id="kunden-suche" placeholder="Name oder Telefon suchen" value="${esc(UI.kundenSuche)}" aria-label="Kunden suchen" style="margin-bottom:10px">
     <div class="card" style="padding:6px 10px">${list.length?`<div class="list">${list.map(k=>`<div class="row click" data-act="kunde-sel" data-id="${k.id}" ${sel&&sel.id===k.id?'style="background:var(--accent-soft)"':''}><div class="grow"><div class="title">${esc(k.nachname||'')}${k.nachname&&k.vorname?', ':''}${esc(k.vorname||'')}</div><div class="small muted">${esc(k.telefon||'')}</div></div><span class="small muted">${letzte[k.id]?fmtDate(letzte[k.id]):'neu'}</span></div>`).join('')}</div>`:`<div class="empty">${S.kunden.length?'Keine Treffer.':'Noch keine Kundinnen und Kunden angelegt.'}</div>`}</div></div>
    <div>${sel?kundeDetail(sel):'<div class="card empty">Kunden links auswählen, um Kundenkarte und Besuche zu sehen.</div>'}</div></div>`;
@@ -496,6 +502,9 @@ mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px"
    ${fld('firma','Salonname',s.firma)}${fld('inhaber','Inhaberin',s.inhaber)}${fld('adresse','Anschrift (Straße, PLZ Ort)',s.adresse)}
    ${fld('steuernummer','Steuernummer',s.steuernummer)}${fld('telefon','Telefon',s.telefon,'tel')}${fld('email','E-Mail',s.email,'email')}</div>
    <h3 style="margin-top:18px">Kasse</h3><div class="fields">${fld('kasseAnfang','Anfangsbestand Bargeld (€)',s.kasseAnfang!=null?eurPlain(s.kasseAnfang):'','text','inputmode="decimal"')}${fld('kasseAnfangDatum','Stichtag Anfangsbestand',s.kasseAnfangDatum||today(),'date')}</div>
+   <h3 style="margin-top:18px">Gäste-WLAN & Nachrichten</h3><div class="fields">${fld('wlanSsid','WLAN-Name (Gastzugang)',s.wlanSsid||'')}${fld('wlanPw','WLAN-Passwort (Gastzugang)',s.wlanPw||'')}</div>
+   <div class="field"><label for="f-erinnText">Text für Terminerinnerung (WhatsApp) – Platzhalter: {vorname} {datum} {zeit} {salon}</label><textarea id="f-erinnText" name="erinnText">${esc(s.erinnText||ERINN_TEXT)}</textarea></div>
+   <div class="field"><label for="f-gebText">Text für Geburtstagsgruß – Platzhalter: {vorname} {salon}</label><textarea id="f-gebText" name="gebText">${esc(s.gebText||GEB_TEXT)}</textarea></div>
    <h3 style="margin-top:18px">Ruhetage (Salon geschlossen)</h3><div class="chips">${[1,2,3,4,5,6,0].map(i=>`<label class="chip" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="ruhetag" value="${i}" ${ruhetage().includes(i)?'checked':''} style="accent-color:var(--accent)">${WD[i]}</label>`).join('')}</div>
    <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
   <div class="card"><h3>Speicherplatz für Fotos</h3><div id="storage-info" class="small muted">Wird gelesen …</div></div>
@@ -510,6 +519,8 @@ mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px"
   <div class="card legal"><h3>Rechtliche Hinweise (Stand 2026)</h3>
    <p><b>Kleinunternehmerregelung (§ 19 UStG):</b> Es wird keine Umsatzsteuer ausgewiesen. Jede Quittung trägt automatisch den Hinweis „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ Grenzen: Umsatz im Vorjahr höchstens 25.000 €, im laufenden Jahr höchstens 100.000 €. Wird im laufenden Jahr 100.000 € überschritten, endet die Regelung sofort. Die Auswertung unter Kasse → EÜR zeigt den Stand.</p>
    <p><b>Kasse:</b> Die gesetzliche Kasse (mit TSE) ist Ihr separates Kassensystem. Dieses Kassenbuch dient der eigenen Übersicht über Einnahmen, Ausgaben und Gewinn; Buchungen können jederzeit bearbeitet werden. Führen Sie täglich einen Tagesabschluss mit Zählung durch. Buchungen lassen sich nicht löschen oder ändern, nur stornieren; die Belegnummern laufen pro Jahr fortlaufend. Ob diese Form der Kassenführung für Ihren Betrieb anerkannt ist, klären Sie bitte mit Ihrer Steuerberatung oder dem Finanzamt.</p>
+   <p><b>Allergietest & Gesundheitsfragen:</b> Ein Gesetz, das den Allergietest vorschreibt, gibt es nicht. Pflicht sind die Warnhinweise der Hersteller nach der EU-Kosmetikverordnung (Verordnung (EG) Nr. 1223/2009, Anhang III): „Haarfärbemittel können schwere allergische Reaktionen hervorrufen“, „Dieses Produkt ist nicht für Personen unter 16 Jahren bestimmt“, „Temporäre Tätowierungen mit ‚schwarzem Henna‘ können das Allergierisiko erhöhen“. Den Hautverträglichkeitstest 48 Stunden vorher empfehlen die Hersteller in der Gebrauchsanweisung. Wer diese Anweisungen nicht beachtet, verletzt die Sorgfaltspflicht aus dem Werkvertrag (§§ 631, 241 Abs. 2 BGB) und kann bei einer allergischen Reaktion auf Schadensersatz und Schmerzensgeld haften (§§ 280 Abs. 1, 823 Abs. 1, 253 Abs. 2 BGB). Darum: Fragen stellen, Test anbieten, beides dokumentieren – die App speichert das mit Unterschrift.</p>
+   <p><b>Gäste-WLAN:</b> Als WLAN-Anbieter haftet der Salon für Rechtsverstöße der Gäste grundsätzlich nicht auf Schadensersatz (§ 8 Digitale-Dienste-Gesetz, früher Telemediengesetz). Trotzdem sinnvoll: eigenes Gastnetz im Router, Nutzungsbedingungen unterschreiben lassen (in der Einverständniserklärung enthalten).</p>
    <p><b>Quittungen:</b> Bis 250 € genügt eine Kleinbetragsrechnung. Darüber sind Name und Anschrift der Kundin nötig – bitte in der Kundenkarte hinterlegen.</p>
    <p><b>Aufbewahrung:</b> Kassenbuch, Rechnungen und Belege 8 bzw. 10 Jahre aufbewahren. Täglich die Datensicherung erstellen und in OneDrive ablegen.</p>
    <p><b>Datenschutz (DSGVO):</b> Fotos von Kundinnen nur mit Einwilligung speichern (Häkchen in der Kundenkarte). Auf Wunsch lässt sich eine Kundenkarte samt Fotos löschen. Alle Daten liegen ausschließlich auf diesem iPad und in Ihren eigenen Sicherungsdateien – nicht im Internet.</p>
@@ -527,13 +538,14 @@ function kundeDetail(k){
   const umsatz=S.kasse.filter(e=>e.kundeId===k.id&&e.art==='einnahme').reduce((s,e)=>s+e.betrag,0);
   return `<button class="btn sm back-btn" data-act="kunde-back" style="margin-bottom:10px">‹ Alle Kunden</button>
   <div class="card"><div class="view-head" style="margin-bottom:8px"><div><h2>${esc(kundeName(k))}</h2><div class="small muted">${esc([k.telefon,k.email].filter(Boolean).join(' · '))}</div></div>
-   <div class="actions"><button class="btn primary" data-act="besuch-neu" data-id="${k.id}">+ Besuch</button><button class="btn" data-act="termin-neu" data-kunde="${k.id}">+ Termin</button><button class="btn" data-act="kunde-edit" data-id="${k.id}">Bearbeiten</button></div></div>
+   <div class="actions"><button class="btn primary" data-act="besuch-neu" data-id="${k.id}">+ Besuch</button><button class="btn" data-act="termin-neu" data-kunde="${k.id}">+ Termin</button><button class="btn" data-act="q-neu" data-kunde="${k.id}">Quittung</button><button class="btn" data-act="kunde-edit" data-id="${k.id}">Bearbeiten</button></div></div>
    <div class="grid g3" style="gap:10px;margin-bottom:6px">
     <div><div class="label">Besuche</div><b class="num">${besuche.length}</b></div><div><div class="label">Umsatz gesamt</div><b class="num">${eur(umsatz)}</b></div>
     <div><div class="label">Nächster Termin</div><b>${naechster?fmtDate(naechster.datum)+' '+esc(naechster.zeit):'–'}</b></div></div>
    ${k.geburtstag?`<div class="small">Geburtstag: ${fmtDate(k.geburtstag)}</div>`:''}${k.adresse?`<div class="small">Anschrift: ${esc(k.adresse)}</div>`:''}
    ${k.notiz?`<div class="notice info" style="margin-top:8px">${esc(k.notiz)}</div>`:''}
    <div class="small" style="margin-top:8px">${k.fotoEinwilligung?`<span class="pill ok">Foto-Einwilligung seit ${fmtDate(k.einwilligungDatum)}</span>`:'<span class="pill warn">Keine Foto-Einwilligung</span>'}</div></div>
+  ${gesundheitCard(k)}
   <div class="card" style="margin-top:16px"><h3>Besuche & Arbeiten</h3>${besuche.length?besuche.map(b=>`<div class="visit"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${fmtDate(b.datum)}${b.zeit?' · '+esc(b.zeit):''}</b><span class="num">${b.betrag?eur(b.betrag):''} <button class="btn sm" data-act="besuch-edit" data-kunde="${k.id}" data-id="${b.id}">Bearbeiten</button></span></div>
     <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${(b.material||[]).length?`<div class="small">Material: ${b.material.map(m=>esc(m.name)+' '+(m.ml!=null?fmtM(m.ml)+' '+esc(m.eh||'ml'):fmtM(m.menge)+' '+esc(m.eh||'Stk'))).join(' + ')}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
     ${(b.fotos||[]).length?`<div class="thumbs">${b.fotos.map(id=>`<img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Noch keine Besuche erfasst.</div>'}</div>`;
@@ -711,7 +723,9 @@ function besuchForm(kundeId,b={},fromTermin){
   const sel=new Set(b.leistungen||(fromTermin&&fromTermin.leistung?[fromTermin.leistung]:[]));
   const fotoOk=k&&k.fotoEinwilligung;
   openModal(neu?'Besuch erfassen – '+kundeName(k):'Besuch bearbeiten',`<form data-form="besuch" data-kunde="${kundeId}" data-id="${b.id||''}" data-termin="${fromTermin?fromTermin.id:''}" data-tdoc="${fromTermin?fromTermin._doc:''}" class="grid" style="gap:14px">
+   ${neu?warnBox(k):''}
    <div class="fields">${fld('datum','Datum',b.datum||today(),'date')}${fld('zeit','Uhrzeit',b.zeit||(fromTermin&&fromTermin.zeit)||nowTime(),'time')}</div>
+   ${neu&&letzterBesuch(kundeId)?`<div><button type="button" class="btn sm" data-act="rezeptur-uebernehmen" data-kunde="${kundeId}">↺ Letzte Rezeptur übernehmen (${fmtDate(letzterBesuch(kundeId).datum)})</button></div>`:''}
    <div class="field"><span class="label">Leistungen</span><div class="chips" id="b-chips">${L.map(l=>`<button type="button" class="chip" data-act="chip" data-name="${esc(l.name)}" data-preis="${l.preis||0}" aria-pressed="${sel.has(l.name)}">${esc(l.name)}${l.preis?' · '+eur(l.preis):''}</button>`).join('')}</div></div>
    <div class="field"><label for="f-rezeptur">Farbe / Rezeptur</label><textarea id="f-rezeptur" name="rezeptur" placeholder="z. B. Ansatz 7/1 + 8/0 (1:1), Oxidant 6 %, Einwirkzeit 35 Min">${esc(b.rezeptur||'')}</textarea></div>
    <div class="field"><label for="f-bnotiz">Notiz</label><input id="f-bnotiz" name="notiz" value="${esc(b.notiz||'')}"></div>
@@ -732,7 +746,7 @@ function renderThumbs(){const t=$('#b-thumbs');if(!t)return;
 function sumChips(scope){const f=(scope&&scope.closest&&scope.closest('form'))||(scope&&scope.querySelector&&scope.querySelector('form'))||document;const inp=f.querySelector('[name=betrag]');if(!inp)return;const s=$$('.chip[aria-pressed="true"]',f).reduce((a,c)=>a+Number(c.dataset.preis||0),0);inp.value=s?eurPlain(s):''}
 const fmtM=n=>(Math.round(n*1000)/1000).toLocaleString('de-DE',{maximumFractionDigits:3});
 const artInhalt=a=>a&&num(a.inhalt)>0?num(a.inhalt):0;
-function vbAdd(id){const a=S.artikel.find(x=>x.id===id);const inh=artInhalt(a);const v=pending.verbrauch.find(x=>x.id===id);
+function vbAdd(id){const a=S.artikel.find(x=>x.id===id);vbWarn(a);const inh=artInhalt(a);const v=pending.verbrauch.find(x=>x.id===id);
   if(v){if(inh){v.ml=num(v.ml)+(inh<=100?inh:0);v.menge=v.ml/inh}else v.menge=Math.round((num(v.menge)+1)*100)/100;return}
   if(inh){const ml=inh<=100?inh:0;pending.verbrauch.push({id,ml,menge:ml/inh})}else pending.verbrauch.push({id,menge:1})}
 function renderVerbrauch(){const box=$('#b-verbrauch');if(!box)return;let tot=0,eh='';
@@ -751,7 +765,7 @@ function artikelForm(a={}){
    ${fld('name','Bezeichnung (z. B. Koleston 7/1)',a.name)}${fld('marke','Marke / Hersteller',a.marke)}
    <div class="field"><label for="f-ean">EAN / Barcode</label><div class="actions" style="flex-wrap:nowrap"><input id="f-ean" name="ean" value="${esc(a.ean||'')}" inputmode="numeric"><button type="button" class="btn sm" data-act="ean-scan">Scannen</button></div></div>
    <div class="field"><label for="f-kategorie">Kategorie</label><select id="f-kategorie" name="kategorie">${ART_KAT.map(k=>`<option ${a.kategorie===k?'selected':''}>${k}</option>`).join('')}</select></div>
-   ${fld('einheit','Einheit',a.einheit||'Stk')}<div class="field"><label for="f-inhalt">Inhalt pro Packung (optional)</label><div class="actions" style="flex-wrap:nowrap"><input id="f-inhalt" name="inhalt" type="number" min="0" step="any" value="${a.inhalt||''}" placeholder="z. B. 60 oder 1000"><select name="inhaltEinheit" style="width:auto" aria-label="Einheit Inhalt">${['ml','g'].map(u=>`<option ${a.inhaltEinheit===u?'selected':''}>${u}</option>`).join('')}</select></div></div>${a.id?'':fld('bestand','Anfangsbestand',a.bestand||0,'number','step="any" min="0"')}${fld('minBestand','Mindestbestand (Warnung)',a.minBestand||0,'number','step="any" min="0"')}
+   ${fld('lieferant','Lieferant (für Bestellliste)',a.lieferant||'')}${fld('einheit','Einheit',a.einheit||'Stk')}<div class="field"><label for="f-inhalt">Inhalt pro Packung (optional)</label><div class="actions" style="flex-wrap:nowrap"><input id="f-inhalt" name="inhalt" type="number" min="0" step="any" value="${a.inhalt||''}" placeholder="z. B. 60 oder 1000"><select name="inhaltEinheit" style="width:auto" aria-label="Einheit Inhalt">${['ml','g'].map(u=>`<option ${a.inhaltEinheit===u?'selected':''}>${u}</option>`).join('')}</select></div></div>${a.id?'':fld('bestand','Anfangsbestand',a.bestand||0,'number','step="any" min="0"')}${fld('minBestand','Mindestbestand (Warnung)',a.minBestand||0,'number','step="any" min="0"')}
    ${fld('ekPreis','Einkaufspreis (€)',a.ekPreis?eurPlain(a.ekPreis):'','text','inputmode="decimal"')}${fld('vkPreis','Verkaufspreis (€, bei Verkaufsware)',a.vkPreis?eurPlain(a.vkPreis):'','text','inputmode="decimal"')}${fld('mhd','Haltbar bis (MHD)',a.mhd,'date')}</div>
    <div class="field"><span class="label">Produktfoto</span><div class="thumbs" id="a-thumb">${a.foto?`<img class="thumb" data-bid="${a.foto}" src="${blobUrl(a.foto)}" alt="Produktfoto">`:''}</div><label class="btn" style="align-self:flex-start">${a.foto?'Foto ersetzen':'Foto aufnehmen / wählen'}<input type="file" accept="image/*" id="a-foto" hidden></label></div>
    <div class="modal-foot">${a.id?`<button type="button" class="btn danger" data-act="artikel-del" data-id="${a.id}" style="margin-right:auto">Löschen</button>`:''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
@@ -909,9 +923,13 @@ function abschlussForm(){
   {wide:true,onMount:m=>{m.addEventListener('input',()=>{const ist=DENOMS.reduce((s,d)=>s+d*(parseInt(m.querySelector(`[name=d${d}]`).value)||0),0);$('#z-sum',m).textContent=eur(ist);const df=ist-soll;$('#z-diff',m).innerHTML=df===0?'<span class="pill ok">stimmt</span>':`<span class="pill ${df<0?'bad':'warn'}">Differenz ${eur(df)}</span>`})}});
 }
 
+/* PDF: Zeichen, die die Standardschrift nicht kennt (ş, ğ, ı …), lesbar ersetzen */
+const WINANSI_EXTRA='€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
+function pdfSafe(t){if(Array.isArray(t))return t.map(pdfSafe);return String(t??'').replace(/[„“”]/g,'"').replace(/[‚‘’]/g,"'").replace(/[^\x20-\x7E\xA0-\xFF\n]/g,c=>{if(WINANSI_EXTRA.includes(c))return c;const m={'ı':'i','İ':'I','ł':'l','Ł':'L','ø':'o','Ø':'O','đ':'d','Đ':'D'}[c];if(m)return m;const d=c.normalize('NFD').replace(/[̀-ͯ]/g,'');return /^[\x20-\x7E\xA0-\xFF]+$/.test(d)?d:''})}
+function newPdf(opt){const doc=new window.jspdf.jsPDF(opt);const t=doc.text.bind(doc),sp=doc.splitTextToSize.bind(doc);doc.text=(s,...a)=>t(pdfSafe(s),...a);doc.splitTextToSize=(s,...a)=>sp(pdfSafe(s),...a);return doc}
 /* ---- Quittung PDF ---- */
 function quittungPDF(e){
-  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a5'});const s=S.settings;const W=148,x=14;let y=16;
+  const doc=newPdf({unit:'mm',format:'a5'});const s=S.settings;const W=148,x=14;let y=16;
   const k=kundeById(e.kundeId);
   doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(s.firma||'SEEN Salon',x,y);y+=6;
   doc.setFont('helvetica','normal');doc.setFontSize(9);
@@ -970,6 +988,17 @@ const ACT={
  /* Lager */
  'scan-lager':()=>startScan(lookupEan),
  'art-foto':el=>{artFotoZiel=el.dataset.id;const i=$('#art-foto-input');i.value='';i.click()},
+ 'erkl-neu':el=>erklaerungForm(kundeById(el.dataset.id)),
+ 'atest':el=>allergieTestForm(kundeById(el.dataset.id)),
+ 'erkl-send':async el=>{await pdfSenden(el.dataset.bid,el.dataset.name,kundeById(el.dataset.kunde))},
+ 'sig-clear':()=>sigClear(),
+ 'rezeptur-uebernehmen':el=>rezepturUebernehmen(el.dataset.kunde),
+ 'stat-open':()=>{UI.kundenStat=true;UI.statJahr=UI.statJahr||new Date().getFullYear();renderBody();window.scrollTo(0,0)},
+ 'stat-close':()=>{UI.kundenStat=false;renderBody()},
+ 'stat-jahr':el=>{UI.statJahr=Number(el.dataset.v);renderBody()},
+ 'bestellliste':()=>bestellListe(),
+ 'bestell-teilen':()=>bestellTeilen(),
+ 'q-neu':el=>quittungForm(el.dataset.kunde),
  'serie-start':el=>serieStart(el.dataset.k,el.dataset.beleg),
  'serie-scan':()=>startScan(serieScan,true),
  'serie-d':el=>{serieAdd(el.dataset.id,Number(el.dataset.d));renderBody()},
@@ -1076,7 +1105,7 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#scann
 /* ---------- Formulare speichern ---------- */
 const FORMS={
  async settings(f){const v=Object.fromEntries(new FormData(f));const a=parseEur(v.kasseAnfang);
-   await mutate('settings/main',d=>({...d,firma:v.firma.trim(),inhaber:v.inhaber.trim(),adresse:v.adresse.trim(),steuernummer:v.steuernummer.trim(),telefon:v.telefon.trim(),email:v.email.trim(),kasseAnfang:isNaN(a)?0:a,kasseAnfangDatum:v.kasseAnfangDatum,ruhetage:new FormData(f).getAll('ruhetag').map(Number)}));toast('Einstellungen gespeichert')},
+   await mutate('settings/main',d=>({...d,firma:v.firma.trim(),inhaber:v.inhaber.trim(),adresse:v.adresse.trim(),steuernummer:v.steuernummer.trim(),telefon:v.telefon.trim(),email:v.email.trim(),kasseAnfang:isNaN(a)?0:a,kasseAnfangDatum:v.kasseAnfangDatum,wlanSsid:(v.wlanSsid||'').trim(),wlanPw:(v.wlanPw||'').trim(),erinnText:(v.erinnText||'').trim()||ERINN_TEXT,gebText:(v.gebText||'').trim()||GEB_TEXT,ruhetage:new FormData(f).getAll('ruhetag').map(Number)}));toast('Einstellungen gespeichert')},
  async wiederkehrend(f){const old=S.settings.wiederkehrend||[];const rows=$$('.wk-row',f).map((r,i)=>({id:(old[i]&&old[i].text===r.querySelector('[name=w-text]').value.trim())?old[i].id:'w'+uid(),text:r.querySelector('[name=w-text]').value.trim(),betrag:parseEur(r.querySelector('[name=w-betrag]').value)||0,kategorie:r.querySelector('[name=w-kat]').value,tag:Math.min(28,Math.max(1,num(r.querySelector('[name=w-tag]').value)||1))})).filter(w=>w.text);
    await mutate('settings/main',d=>({...d,wiederkehrend:rows}));toast('Abbuchungen gespeichert')},
  async leistungen(f){const rows=$$('.l-row',f).map((r,i)=>({id:'l'+i+uid().slice(-3),name:r.querySelector('[name=l-name]').value.trim(),preis:parseEur(r.querySelector('[name=l-preis]').value)||0,dauer:num(r.querySelector('[name=l-dauer]').value)||30})).filter(l=>l.name);
@@ -1084,7 +1113,7 @@ const FORMS={
  async kunde(f){const v=Object.fromEntries(new FormData(f));if(!v.vorname.trim()&&!v.nachname.trim()){toast('Bitte einen Namen eingeben.');return false}
    const id=f.dataset.id||uid();const old=kundeById(id)||{};const ein=!!v.fotoEinwilligung;
    const data={vorname:v.vorname.trim(),nachname:v.nachname.trim(),telefon:v.telefon.trim(),email:v.email.trim(),geburtstag:v.geburtstag,adresse:v.adresse.trim(),notiz:v.notiz.trim(),fotoEinwilligung:ein,einwilligungDatum:ein?(old.einwilligungDatum||today()):'',erstellt:old.erstellt||new Date().toISOString()};
-   await db.doc('kunden/'+id).set(data);UI.kundeSel=id;if(UI.view!=='kunden')go('kunden');toast('Kundenkarte gespeichert')},
+   const keep={...old};delete keep.id;await db.doc('kunden/'+id).set({...keep,...data});UI.kundeSel=id;if(UI.view!=='kunden')go('kunden');toast('Kundenkarte gespeichert')},
  async termin(f){const v=Object.fromEntries(new FormData(f));const k=kundeFromLabel(v.kunde);
    if(!v.kunde.trim()){toast('Bitte einen Namen eingeben.');return false}
    const t={id:f.dataset.id||uid(),kundeId:k?k.id:'',name:k?kundeName(k):v.kunde.trim(),datum:v.datum,zeit:v.zeit,dauer:num(v.dauer)||30,leistung:v.leistung,notiz:v.notiz.trim(),status:v.status||'geplant'};
@@ -1113,7 +1142,7 @@ const FORMS={
  async artikel(f){const v=Object.fromEntries(new FormData(f));if(!v.name.trim()){toast('Bitte eine Bezeichnung eingeben.');return false}
    const ean=v.ean.trim();const dup=ean&&S.artikel.find(x=>x.ean===ean&&x.id!==f.dataset.id);if(dup){toast('Dieser Barcode gehört schon zu „'+dup.name+'“.',4000);return false}
    const old=S.artikel.find(x=>x.id===f.dataset.id)||{};const nm=v.name.trim();
-   const data={name:nm,marke:v.marke.trim(),ean,kategorie:v.kategorie,einheit:v.einheit.trim()||'Stk',inhalt:num(v.inhalt)||0,inhaltEinheit:v.inhaltEinheit||'ml',minBestand:num(v.minBestand),ekPreis:parseEur(v.ekPreis)||0,vkPreis:parseEur(v.vkPreis)||0,mhd:v.mhd||'',suche:nm==='Unbekannter Artikel'?(old.suche||(ean?'offen':'')):''};
+   const data={name:nm,marke:v.marke.trim(),ean,kategorie:v.kategorie,lieferant:(v.lieferant||'').trim(),einheit:v.einheit.trim()||'Stk',inhalt:num(v.inhalt)||0,inhaltEinheit:v.inhaltEinheit||'ml',minBestand:num(v.minBestand),ekPreis:parseEur(v.ekPreis)||0,vkPreis:parseEur(v.vkPreis)||0,mhd:v.mhd||'',suche:nm==='Unbekannter Artikel'?(old.suche||(ean?'offen':'')):''};
    if(artikelFotoFile){try{data.foto=await produktFoto(artikelFotoFile);if(old.foto)assets.delete(old.foto).catch(()=>{})}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}}
    if(f.dataset.id){await db.doc('artikel/'+f.dataset.id).update(data)}
    else{const id=uid();await db.doc('artikel/'+id).set({...data,bestand:0});const st=num(v.bestand);if(st)await lagerBewegung(id,st,'zugang','Anfangsbestand')}
@@ -1166,6 +1195,35 @@ const FORMS={
  async recoverAlt(f){const code=String(f.querySelector('[name=code]').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const fmt=code.slice(0,5)+'-'+code.slice(5);
    if(S.settings.recoveryHash&&await pinHash('R:'+fmt)===S.settings.recoveryHash){await mutate('settings/main',d=>({...d,pinHash:'',recoveryHash:'',appLock:false}));UI.appLocked=false;UI.pinRecover=false;UI.unlocked=false;toast('Entsperrt. Bitte unter „Mehr“ eine neue PIN festlegen.',6000);UI.view='mehr';renderNav();renderShell()}
    else toast('Code stimmt nicht.');return false},
+ async erklaerung(f){const k=kundeById(f.dataset.kunde);if(!k)return false;const v=Object.fromEntries(new FormData(f));
+   if(!v.datenschutz){toast('Bitte die Datenschutzhinweise bestätigen lassen (Häkchen).',4000);return false}
+   if(!sig.drawn){toast('Bitte unterschreiben lassen.',3500);return false}
+   if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return false}
+   const btn=f.querySelector('button.primary');btn.disabled=true;btn.textContent='Speichert …';
+   const d=today();const an={datum:d,reaktion:!!v.reaktion,henna:!!v.henna,kopfhaut:!!v.kopfhaut,allergien:!!v.allergien,text:(v.atext||'').trim()};
+   const foto=!!v.foto,wlan=!!v.wlan;const sigUrl=sigJpeg();
+   try{const pdf=erklaerungPDF(k,an,{foto,wlan},sigUrl);const r=await assets.upload(pdf,{type:'application/pdf'});
+     const name='Einverstaendnis_'+(kundeName(k)||'Kunde').replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,'_')+'_'+d+'.pdf';
+     await mutate('kunden/'+k.id,x=>({...x,anamnese:an,fotoEinwilligung:foto,einwilligungDatum:foto?(x.einwilligungDatum||d):'',wlan:wlan?d:(x.wlan||''),erklaerungen:[...(x.erklaerungen||[]),{id:uid(),datum:d,pdf:r.id,name}]}));
+     openModal('Einverständnis gespeichert',`<p style="margin:0">Die unterschriebene Erklärung ist als PDF in der Kundenkarte archiviert.</p>${k.email?`<p class="small muted" style="margin:0">Beim Senden wird die E-Mail-Adresse <b>${esc(k.email)}</b> in die Zwischenablage kopiert – im Mail-Programm bei „An“ einfügen.</p>`:'<p class="small muted" style="margin:0">Für diese Kundin ist keine E-Mail-Adresse hinterlegt.</p>'}
+      <div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button><button class="btn primary" data-act="erkl-send" data-bid="${r.id}" data-name="${esc(name)}" data-kunde="${k.id}">Kopie senden (Mail)</button></div>`);
+   }catch(e){console.error(e);btn.disabled=false;btn.textContent='Unterschreiben & speichern';toast('Speichern fehlgeschlagen.',4000)}
+   return false},
+ async atest(f){const k=kundeById(f.dataset.kunde);const v=Object.fromEntries(new FormData(f));if(!v.datum){toast('Bitte ein Datum eingeben.');return false}
+   await mutate('kunden/'+k.id,x=>({...x,allergietest:{datum:v.datum,ergebnis:v.ergebnis,produkt:(v.produkt||'').trim(),notiz:(v.notiz||'').trim()},allergietests:[...(x.allergietests||[]),{datum:v.datum,ergebnis:v.ergebnis,produkt:(v.produkt||'').trim(),notiz:(v.notiz||'').trim()}]}));
+   toast(v.ergebnis==='reaktion'?'Gespeichert – Reaktion vermerkt, bitte nicht färben!':'Allergietest gespeichert',4000)},
+ async quittung(f){const v=Object.fromEntries(new FormData(f));const betrag=parseEur(v.betrag);if(!(betrag>0)){toast('Bitte einen gültigen Betrag eingeben.');return false}
+   if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return false}
+   const k=v.kunde?kundeFromLabel(v.kunde):null;const leist=$$('#q-chips .chip[aria-pressed="true"]',f).map(c=>({text:c.dataset.name,betrag:Number(c.dataset.preis)||0})).filter(l=>l.betrag);
+   const y=String(v.datum).slice(0,4);let nr='';await mutate('settings/main',d=>{const c={...(d.quittungNr||{})};c[y]=(c[y]||0)+1;nr='Q'+y+'-'+String(c[y]).padStart(3,'0');return {...d,quittungNr:c}});
+   const e={nr,datum:v.datum,art:'einnahme',zahlart:v.zahlart,betrag,text:(v.text||'').trim()||leist.map(l=>l.text).join(', ')||'Friseurleistung',kundeId:k?k.id:'',kundeName:k?kundeName(k):(v.kunde||'').trim(),positionen:leist};
+   if(betrag>25000&&!(k&&k.adresse))toast('Hinweis: Über 250 € gehören Name und Anschrift der Kundin auf die Rechnung.',5000);
+   const pdf=quittungPDF(e);const r=await assets.upload(pdf,{type:'application/pdf'});const name='Quittung_'+nr+'.pdf';
+   await mutate('quittungen/'+y,d=>{d.list=d.list||[];d.list.push({...e,positionen:leist,pdf:r.id,ts:new Date().toISOString()});return d});
+   if(k)await mutate('kunden/'+k.id,x=>({...x,quittungen:[...(x.quittungen||[]),{nr,datum:v.datum,betrag,pdf:r.id,name}]}));
+   openModal('Quittung '+nr,`<p style="margin:0">Quittung über <b>${eur(betrag)}</b> erstellt${k?' und in der Kundenkarte abgelegt':''}. Sie wird <b>nicht</b> ins Kassenbuch gebucht – der Betrag gehört in die Tageseinnahmen.</p>${k&&k.email?`<p class="small muted" style="margin:0">Beim Senden wird <b>${esc(k.email)}</b> in die Zwischenablage kopiert.</p>`:''}
+    <div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button><button class="btn primary" data-act="erkl-send" data-bid="${r.id}" data-name="${esc(name)}" data-kunde="${k?k.id:''}">Senden / Drucken</button></div>`);
+   return false},
  async scanneu(f){const v=Object.fromEntries(new FormData(f));const nm=v.name.trim();const id=uid();const menge=num(v.menge);
    let foto='';if(artikelFotoFile){try{foto=await produktFoto(artikelFotoFile)}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}}
    else if(f.dataset.bild){try{const r=await fetch(f.dataset.bild);const bl=await r.blob();if(r.ok&&/^image\//.test(bl.type))foto=await produktFoto(bl)}catch(_){}}
@@ -1297,6 +1355,155 @@ let artFotoZiel=null;
 $('#art-foto-input').addEventListener('change',async ev=>{const f=ev.target.files&&ev.target.files[0];const id=artFotoZiel;artFotoZiel=null;if(!f||!id)return;
   try{toast('Foto wird gespeichert …');const old=(S.artikel.find(x=>x.id===id)||{}).foto;const fid=await produktFoto(f);await db.doc('artikel/'+id).update({foto:fid});if(old)assets.delete(old).catch(()=>{});
     toast('Produktfoto gespeichert');if(!$('#modal-root').hidden){const a=S.artikel.find(x=>x.id===id);if(a)artikelAktion({...a,foto:fid})}else renderBody()}catch(e){toast('Foto konnte nicht gespeichert werden.',4000)}});
+/* ================= Gesundheit, Einverständnis, Nachrichten, Auswertung ================= */
+const ERINN_TEXT='Hallo {vorname}, kleine Erinnerung: Ihr Termin bei {salon} ist am {datum} um {zeit} Uhr. Falls etwas dazwischenkommt, sagen Sie bitte kurz Bescheid. Bis bald!';
+const GEB_TEXT='Liebe/r {vorname}, alles Liebe zum Geburtstag wünscht Ihnen {salon}! 🎉';
+const salonName=()=>S.settings.firma||'SEEN Salon';
+const fillText=(t,o)=>String(t).replace(/\{(\w+)\}/g,(m,k)=>o[k]!=null?o[k]:m);
+const telWa=t=>{let d=String(t||'').replace(/[^\d+]/g,'');if(!d)return '';if(d.startsWith('+'))d=d.slice(1);else if(d.startsWith('00'))d=d.slice(2);else if(d.startsWith('0'))d='49'+d.slice(1);return d.length>=9?d:''};
+const waLink=(tel,text)=>{const n=telWa(tel);return n?`https://wa.me/${n}?text=${encodeURIComponent(text)}`:''};
+const waBtn=(tel,text,attrs='',label='WhatsApp')=>{const l=waLink(tel,text);return l?`<a class="btn sm ok" href="${l}" target="_blank" rel="noopener" ${attrs}>${label}</a>`:'<span class="small muted">keine Handynummer</span>'};
+const tageSeit=d=>Math.round((parseDate(today())-parseDate(d))/864e5);
+function alterVon(g){if(!g)return null;const b=parseDate(g),t=parseDate(today());let a=t.getFullYear()-b.getFullYear();if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))a--;return a}
+const letzteErkl=k=>(k.erklaerungen||[]).slice().sort((a,b)=>a.datum<b.datum?1:-1)[0];
+function gesundheit(k){const w=[];if(!k)return w;const an=k.anamnese,at=k.allergietest;
+  if(an&&(an.reaktion||an.henna||an.kopfhaut||an.allergien))w.push({cls:'bad',txt:'Achtung: '+[an.reaktion&&'frühere Reaktion auf Haarfarbe',an.henna&&'Tattoo mit schwarzem Henna',an.kopfhaut&&'Kopfhaut verletzt / Ekzem',an.allergien&&'Allergien'].filter(Boolean).join(', ')+(an.text?' – '+an.text:'')});
+  if(at&&at.ergebnis==='reaktion')w.push({cls:'bad',txt:'Allergietest vom '+fmtDate(at.datum)+': REAKTION – nicht mit diesem Produkt färben'+(at.produkt?' ('+at.produkt+')':'')});
+  const al=alterVon(k.geburtstag);if(al!=null&&al<16)w.push({cls:'bad',txt:'Unter 16 Jahre – oxidative Haarfarben laut Warnhinweis nicht verwenden'});
+  const er=letzteErkl(k);
+  if(!an||!an.datum)w.push({cls:'warn',txt:'Gesundheitsfragen und Unterschrift fehlen noch'});
+  else if(tageSeit(an.datum)>365||!er||tageSeit(er.datum)>365)w.push({cls:'warn',txt:'Gesundheitsfragen/Einverständnis älter als 12 Monate – bitte erneuern'});
+  if(at&&at.ergebnis==='abgelehnt')w.push({cls:'warn',txt:'Allergietest am '+fmtDate(at.datum)+' von der Kundin abgelehnt'});
+  else if(!at||!at.datum)w.push({cls:'warn',txt:'Noch kein Allergietest dokumentiert'});
+  else if(at.ergebnis!=='reaktion'&&tageSeit(at.datum)>182)w.push({cls:'warn',txt:'Allergietest älter als 6 Monate ('+fmtDate(at.datum)+')'});
+  return w}
+function warnBox(k){const w=gesundheit(k);if(!w.length)return '';return `<div class="warnlist">${w.map(x=>`<div class="notice" style="${x.cls==='bad'?'background:var(--bad-soft);font-weight:600':''}">${esc(x.txt)}</div>`).join('')}</div>`}
+function vbWarn(a){if(!a||a.kategorie!=='Haarfarbe')return;const f=$('form[data-form=besuch]');const k=f&&kundeById(f.dataset.kunde);const w=gesundheit(k);const bad=w.filter(x=>x.cls==='bad');
+  if(bad.length)toast('⚠ '+bad[0].txt,6000);else if(w.length)toast('Hinweis: '+w[0].txt,4500)}
+function gesundheitCard(k){const w=gesundheit(k);const an=k.anamnese,at=k.allergietest;const erk=(k.erklaerungen||[]).slice().sort((a,b)=>a.datum<b.datum?1:-1);
+  const ATL={ok:'unauffällig',reaktion:'REAKTION',abgelehnt:'abgelehnt'};
+  return `<div class="card" style="margin-top:16px"><div class="view-head" style="margin-bottom:8px"><h3 style="margin:0">Gesundheit & Einverständnis</h3><div class="actions"><button class="btn primary sm" data-act="erkl-neu" data-id="${k.id}">Fragebogen & Unterschrift</button><button class="btn sm" data-act="atest" data-id="${k.id}">Allergietest eintragen</button></div></div>
+   ${w.length?warnBox(k):'<span class="pill ok">Alles aktuell</span>'}
+   <div class="grid g3" style="gap:10px;margin-top:10px"><div><div class="label">Gesundheitsfragen</div><b>${an&&an.datum?fmtDate(an.datum):'–'}</b></div>
+    <div><div class="label">Allergietest</div><b>${at&&at.datum?fmtDate(at.datum)+' · '+(ATL[at.ergebnis]||''):'–'}</b>${at&&at.produkt?`<div class="small muted">${esc(at.produkt)}</div>`:''}</div>
+    <div><div class="label">Gäste-WLAN</div><b>${k.wlan?'Bedingungen akzeptiert '+fmtDate(k.wlan):'–'}</b></div></div>
+   ${erk.length?`<div class="list" style="margin-top:8px">${erk.map(e=>`<div class="row"><div class="grow"><div class="title">Einverständniserklärung</div><div class="small muted">unterschrieben am ${fmtDate(e.datum)}</div></div><a class="btn sm" href="#" data-bid-open="${e.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${e.pdf}" data-name="${esc(e.name||'Einverstaendnis.pdf')}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
+   ${(k.quittungen||[]).length?`<div class="label" style="margin-top:12px">Quittungen</div><div class="list">${k.quittungen.slice().reverse().map(q=>`<div class="row"><div class="grow"><div class="title">${esc(q.nr)}</div><div class="small muted">${fmtDate(q.datum)}</div></div><span class="num">${eur(q.betrag)}</span><a class="btn sm" href="#" data-bid-open="${q.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${q.pdf}" data-name="${esc(q.name)}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
+  </div>`}
+const RECHT_HAAR='Oxidative Haarfärbemittel können schwere allergische Reaktionen hervorrufen. Sie sind nicht für Personen unter 16 Jahren bestimmt. Temporäre Tätowierungen mit "schwarzem Henna" können das Allergierisiko erhöhen (Pflicht-Warnhinweise nach Verordnung (EG) Nr. 1223/2009, Anhang III). Die Hersteller empfehlen vor jeder Färbung einen Hautverträglichkeitstest (Allergietest), der 48 Stunden vor der Anwendung durchgeführt wird.';
+const RECHT_BESTAET='Ich habe die Fragen wahrheitsgemäß beantwortet und informiere den Salon, wenn sich an meinen Angaben etwas ändert. Mir wurde ein Allergietest angeboten. Verzichte ich darauf, geschieht dies auf eigene Verantwortung.';
+function datenschutzText(){const s=S.settings;return `Verantwortlich: ${[s.firma||'SEEN Salon',s.inhaber,s.adresse].filter(Boolean).join(', ')}. Wir speichern Ihre Kontaktdaten (Name, Telefon, E-Mail, Geburtstag), Termine, durchgeführte Leistungen und Farbrezepturen, um Sie fachgerecht zu bedienen (Art. 6 Abs. 1 lit. b DSGVO). Ihre Angaben zu Allergien und Verträglichkeit speichern wir nur mit Ihrer ausdrücklichen Einwilligung, um gesundheitliche Schäden zu vermeiden (Art. 9 Abs. 2 lit. a DSGVO). Die Daten liegen auf dem Salon-iPad und in passwortgeschützten Sicherungskopien des Salons; sie werden nicht an Dritte weitergegeben und gelöscht, wenn sie nicht mehr benötigt werden und keine Aufbewahrungspflicht besteht. Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung sowie auf Beschwerde beim Landesbeauftragten für Datenschutz Baden-Württemberg. Eine Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen.`}
+const FOTO_TEXT='Ich bin einverstanden, dass Vorher-/Nachher-Fotos meiner Frisur zur Dokumentation in meiner Kundenkarte gespeichert werden. Eine Veröffentlichung (z. B. Internet, soziale Medien) erfolgt nur mit meiner gesonderten Zustimmung. Ich kann die Einwilligung jederzeit widerrufen; die Fotos werden dann gelöscht.';
+function wlanText(){const s=S.settings;return `Der Salon stellt seinen Gästen kostenlos einen WLAN-Gastzugang${s.wlanSsid?' ("'+s.wlanSsid+'")':''} zur Verfügung – ohne Gewähr für Verfügbarkeit, Geschwindigkeit oder Sicherheit. Die Nutzung erfolgt auf eigene Verantwortung. Der Gast verpflichtet sich, den Zugang nicht für rechtswidrige Zwecke zu nutzen, insbesondere keine urheberrechtlich geschützten Werke herunterzuladen oder anzubieten (z. B. Filesharing/Tauschbörsen), keine strafbaren, jugendgefährdenden oder beleidigenden Inhalte abzurufen oder zu verbreiten und keine Dritten zu belästigen. Für Rechtsverstöße, die über den Zugang begangen werden, ist allein der Gast verantwortlich; er stellt den Salon von daraus entstehenden Ansprüchen Dritter frei. Der Salon haftet nicht für Schäden an Endgeräten, Datenverlust oder Viren, außer bei Vorsatz oder grober Fahrlässigkeit. Der Zugang kann jederzeit ohne Angabe von Gründen gesperrt werden. Die Zugangsdaten dürfen nicht an Dritte weitergegeben werden.`}
+const FRAGEN=[['reaktion','Hatten Sie schon einmal eine Reaktion auf Haarfarbe (Juckreiz, Rötung, Schwellung, Brennen)?'],['henna','Hatten Sie jemals ein (Urlaubs-)Tattoo mit „schwarzem Henna“?'],['kopfhaut','Ist Ihre Kopfhaut derzeit gereizt, verletzt, entzündet oder haben Sie ein Ekzem / Sonnenbrand?'],['allergien','Haben Sie bekannte Allergien (z. B. gegen Kosmetik, Duftstoffe, Nickel, Latex)?']];
+let sig={drawn:false};
+function erklaerungForm(k){if(!k)return;const an=k.anamnese||{};
+  openModal('Gesundheitsfragen & Einverständnis – '+kundeName(k),`<form data-form="erklaerung" data-kunde="${k.id}" class="grid" style="gap:14px">
+   <div class="notice info small">Bitte gemeinsam mit der Kundin ausfüllen und unterschreiben lassen. Gilt 12 Monate.</div>
+   <div class="field"><span class="label">1. Gesundheitsfragen (Häkchen = Ja)</span><div class="grid" style="gap:8px">${FRAGEN.map(([n,q])=>`<label class="check"><input type="checkbox" name="${n}" ${an[n]?'checked':''}><span>${esc(q)}</span></label>`).join('')}</div></div>
+   <div class="field"><label for="f-atext">Welche Allergien / Anmerkungen?</label><input id="f-atext" name="atext" value="${esc(an.text||'')}"></div>
+   <div class="legaltxt">${esc(RECHT_HAAR)} ${esc(RECHT_BESTAET)}</div>
+   <div class="field"><span class="label">2. Datenschutz</span><div class="legaltxt">${esc(datenschutzText())}</div><label class="check"><input type="checkbox" name="datenschutz"><span>Ich habe die Datenschutzhinweise gelesen und willige ein, dass meine Angaben zu Allergien und Verträglichkeit gespeichert werden.</span></label></div>
+   <div class="field"><span class="label">3. Fotos</span><label class="check"><input type="checkbox" name="foto" ${k.fotoEinwilligung?'checked':''}><span>${esc(FOTO_TEXT)}</span></label></div>
+   <div class="field"><span class="label">4. Gäste-WLAN</span><div class="legaltxt">${esc(wlanText())}</div><label class="check"><input type="checkbox" name="wlan" ${k.wlan?'checked':''}><span>Ich möchte das Gäste-WLAN nutzen und akzeptiere die Nutzungsbedingungen.</span></label></div>
+   <div class="field"><span class="label">Unterschrift Kundin / Kunde</span><canvas id="sigpad" class="sigpad" aria-label="Unterschriftsfeld"></canvas><div style="display:flex;justify-content:space-between;align-items:center"><span class="small muted">${esc(S.settings.adresse?String(S.settings.adresse).split(',').pop().trim():'')}, ${fmtDate(today())}</span><button type="button" class="btn sm" data-act="sig-clear">Unterschrift löschen</button></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Unterschreiben & speichern</button></div></form>`,
+  {wide:true,onMount:m=>sigInit($('#sigpad',m))});
+}
+function sigInit(c){sig={drawn:false,c};const r=c.getBoundingClientRect();const dpr=window.devicePixelRatio||1;c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);
+  const x=c.getContext('2d');x.scale(dpr,dpr);x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#111';x.fillStyle='#fff';x.fillRect(0,0,r.width,r.height);
+  let down=false,lx=0,ly=0;const pos=e=>{const b=c.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top]};
+  c.addEventListener('pointerdown',e=>{down=true;c.setPointerCapture(e.pointerId);[lx,ly]=pos(e);x.beginPath();x.arc(lx,ly,1.1,0,7);x.fillStyle='#111';x.fill();e.preventDefault()});
+  c.addEventListener('pointermove',e=>{if(!down)return;const [nx,ny]=pos(e);x.beginPath();x.moveTo(lx,ly);x.lineTo(nx,ny);x.stroke();lx=nx;ly=ny;sig.drawn=true;e.preventDefault()});
+  const up=()=>{down=false};c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up)}
+function sigJpeg(){const c=sig.c;const w=600,h=Math.round(600*c.height/c.width);const o=document.createElement('canvas');o.width=w;o.height=h;const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(c,0,0,w,h);return o.toDataURL('image/jpeg',.85)}
+function sigClear(){const c=sig.c;if(!c)return;const x=c.getContext('2d');x.save();x.setTransform(1,0,0,1,0,0);x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.restore();sig.drawn=false}
+function erklaerungPDF(k,an,opt,sigUrl){const doc=newPdf({unit:'mm',format:'a4'});const s=S.settings;const x=18,W=210,maxW=W-2*x;let y=18;
+  const need=h=>{if(y+h>282){doc.addPage();y=18}};
+  const para=(t,size=9.5,style='normal',gap=2)=>{doc.setFont('helvetica',style);doc.setFontSize(size);const L=doc.splitTextToSize(String(t).replace(/[„“]/g,'"'),maxW);L.forEach(l=>{need(size*.45);doc.text(l,x,y);y+=size*.45});y+=gap};
+  const head=t=>{y+=1;need(12);para(t,11,'bold',0.5)};
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(s.firma||'SEEN Salon',x,y);y+=6;doc.setFont('helvetica','normal');doc.setFontSize(9);
+  [s.inhaber,s.adresse,[s.telefon?'Tel. '+s.telefon:'',s.email].filter(Boolean).join(' · ')].filter(Boolean).forEach(l=>{doc.text(l,x,y);y+=4.3});y+=5;
+  para('Gesundheitsfragen und Einverständniserklärung',14,'bold',1);
+  para('Kundin / Kunde: '+kundeName(k)+(k.geburtstag?'   ·   geboren am '+fmtDate(k.geburtstag):'')+'   ·   Datum: '+fmtDate(an.datum),10,'normal',3);
+  head('1. Gesundheitsfragen');FRAGEN.forEach(([n,q])=>{para((an[n]?'[X] JA    ':'[ ] nein  ')+'  '+q.replace(/[„“]/g,'"'),9.5,'normal',1)});
+  if(an.text)para('Allergien / Anmerkungen: '+an.text,9.5,'normal',2);
+  para(RECHT_HAAR,8.3,'normal',1.2);para(RECHT_BESTAET,8.3,'normal',1.5);
+  head('2. Datenschutz (DSGVO)');para(datenschutzText(),8.3,'normal',1.2);para('[X] Ich habe die Datenschutzhinweise gelesen und willige in die Speicherung meiner Angaben zu Allergien und Verträglichkeit ein.',9.5,'normal',2);
+  head('3. Fotos');para((opt.foto?'[X] ':'[ ] ')+FOTO_TEXT,9,'normal',2);
+  head('4. Nutzungsbedingungen Gäste-WLAN');para(wlanText(),8.3,'normal',1.2);para((opt.wlan?'[X] Ich möchte das Gäste-WLAN nutzen und akzeptiere die Nutzungsbedingungen.':'[ ] Gäste-WLAN wird nicht genutzt.'),9.5,'normal',2);
+  if(opt.wlan&&s.wlanSsid)para('WLAN: '+s.wlanSsid+(s.wlanPw?'   ·   Passwort: '+s.wlanPw:''),9.5,'bold',2);
+  need(40);y+=2;const city=s.adresse?String(s.adresse).split(',').pop().trim():'';
+  try{doc.addImage(sigUrl,'JPEG',x+95,y,70,28)}catch(e){}
+  doc.setDrawColor(120);doc.line(x,y+29,x+80,y+29);doc.line(x+95,y+29,W-x,y+29);
+  doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text((city?city+', ':'')+fmtDate(an.datum),x,y+27);
+  doc.setFontSize(8);doc.text('Ort, Datum',x,y+33);doc.text('Unterschrift Kundin / Kunde',x+95,y+33);y+=39;
+  doc.setFontSize(7.5);doc.setTextColor(120);doc.text('Diese Erklärung gilt 12 Monate. Erstellt mit SEEN Salon am '+fmtDate(today())+'.',x,Math.min(y,288));
+  return doc.output('blob')}
+function allergieTestForm(k){if(!k)return;const at=k.allergietest||{};const hist=(k.allergietests||[]).slice().reverse();const ATL={ok:'unauffällig',reaktion:'Reaktion',abgelehnt:'abgelehnt'};
+  openModal('Allergietest – '+kundeName(k),`<form data-form="atest" data-kunde="${k.id}" class="grid" style="gap:12px">
+   <p class="small muted" style="margin:0">Etwas angemischte Farbe hinter dem Ohr oder in der Armbeuge auftragen, 48 Stunden einwirken lassen, dann ansehen. Hier das Ergebnis eintragen.</p>
+   <div class="fields">${fld('datum','Datum des Tests',today(),'date')}${fld('produkt','Getestetes Produkt (z. B. Koleston 7/1 + 6 %)','')}</div>
+   <div class="field"><span class="label">Ergebnis</span><div class="seg" role="group">${[['ok','Unauffällig'],['reaktion','Reaktion'],['abgelehnt','Test abgelehnt']].map(([v,l],i)=>`<button type="button" data-act="seg" data-name="ergebnis" data-v="${v}" aria-pressed="${i===0}">${l}</button>`).join('')}</div><input type="hidden" name="ergebnis" value="ok"></div>
+   ${fld('notiz','Notiz','')}
+   ${hist.length?`<div><div class="label">Bisherige Tests</div>${hist.map(h=>`<div class="small">${fmtDate(h.datum)} · ${ATL[h.ergebnis]||''}${h.produkt?' · '+esc(h.produkt):''}${h.notiz?' · '+esc(h.notiz):''}</div>`).join('')}</div>`:''}
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`)}
+async function pdfSenden(bid,name,k){const r=await IDB.get('blobs',bid);if(!r){toast('Datei nicht gefunden.');return}
+  const blob=r.blob||r.data||r;if(k&&k.email){try{await navigator.clipboard.writeText(k.email);toast('E-Mail-Adresse kopiert – im Mail-Programm bei „An“ einfügen.',4500)}catch(_){}}
+  await saveFile(name||'Dokument.pdf',blob instanceof Blob?blob:new Blob([blob],{type:'application/pdf'}))}
+const letzterBesuch=kid=>S.besuche.filter(b=>b.kundeId===kid&&(b.rezeptur||(b.material||[]).length)).sort((a,b)=>b.datum.localeCompare(a.datum))[0];
+function rezepturUebernehmen(kid){const b=letzterBesuch(kid);if(!b)return;const t=$('#f-rezeptur');if(t&&b.rezeptur)t.value=b.rezeptur;let n=0;
+  (b.material||[]).forEach(m=>{const a=S.artikel.find(x=>x.id===m.id);if(!a)return;if(pending.verbrauch.some(v=>v.id===a.id))return;const inh=artInhalt(a);pending.verbrauch.push(inh?{id:a.id,ml:num(m.ml),menge:num(m.ml)/inh}:{id:a.id,menge:num(m.menge)});n++});
+  renderVerbrauch();(b.material||[]).forEach(m=>vbWarn(S.artikel.find(x=>x.id===m.id)));toast('Rezeptur vom '+fmtDate(b.datum)+' übernommen'+(n?' ('+n+' Material)':'')+' – bitte prüfen.',3500)}
+function naechsterOffen(){let d=addDays(today(),1);for(let i=0;i<7;i++){if(!ruhetage().includes(parseDate(d).getDay())&&S.termine.some(t=>t.datum===d&&t.status!=='abgesagt'))return d;d=addDays(d,1)}return addDays(today(),1)}
+function erinnerungCard(){const d=naechsterOffen();const L=S.termine.filter(t=>t.datum===d&&t.status!=='abgesagt').sort(byZeit);if(!L.length)return '';
+  return `<div class="card"><h3>Erinnern – Termine ${tageSeit(d)===-1?'morgen':fmtDateLong(d)}</h3><div class="list">${L.map(t=>{const k=kundeById(t.kundeId);const txt=fillText(S.settings.erinnText||ERINN_TEXT,{vorname:k?(k.vorname||kundeName(k)):(t.name||''),datum:parseDate(d).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'}),zeit:t.zeit,salon:salonName()});
+    return `<div class="row"><span class="time">${esc(t.zeit)}</span><div class="grow"><div class="title">${esc(k?kundeName(k):t.name||'')}</div><div class="small muted">${esc(t.leistung||'')}</div></div>${t.erinnert?'<span class="pill ok">erinnert ✓</span>':''}${waBtn(k&&k.telefon,txt,`data-wa="termin" data-id="${t.id}" data-doc="${t._doc}"`,t.erinnert?'Nochmal':'WhatsApp')}</div>`}).join('')}</div></div>`}
+function gebNaechste(tage){const t=parseDate(today());const y=t.getFullYear();return S.kunden.filter(k=>k.geburtstag).map(k=>{const g=parseDate(k.geburtstag);let n=new Date(y,g.getMonth(),g.getDate());if(n<t)n=new Date(y+1,g.getMonth(),g.getDate());return {k,in:Math.round((n-t)/864e5),datum:isoDate(n)}}).filter(x=>x.in<tage).sort((a,b)=>a.in-b.in)}
+function geburtstagCard(){const L=gebNaechste(7);if(!L.length)return '';const y=new Date().getFullYear();
+  return `<div class="card"><h3>Geburtstage diese Woche</h3><div class="list">${L.map(({k,in:n,datum})=>`<div class="row"><div class="grow"><div class="title">${esc(kundeName(k))}</div><div class="small muted">${n===0?'<b>heute</b>':n===1?'morgen':fmtDate(datum)}${alterVon(k.geburtstag)!=null?' · wird '+(alterVon(k.geburtstag)+(n===0?0:1)):''}</div></div>${k.gratuliert===y?'<span class="pill ok">gratuliert ✓</span>':''}${waBtn(k.telefon,fillText(S.settings.gebText||GEB_TEXT,{vorname:k.vorname||kundeName(k),salon:salonName()}),`data-wa="geb" data-id="${k.id}"`)}</div>`).join('')}</div></div>`}
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-wa]');if(!a)return;
+  if(a.dataset.wa==='termin')mutate('termine/'+a.dataset.doc,d=>{(d.list||[]).forEach(x=>{if(x.id===a.dataset.id)x.erinnert=true});return d}).catch(()=>{});
+  else if(a.dataset.wa==='geb')mutate('kunden/'+a.dataset.id,d=>({...d,gratuliert:new Date().getFullYear()})).catch(()=>{});
+  else if(a.dataset.wa==='rueck')mutate('kunden/'+a.dataset.id,d=>({...d,rueckKontakt:today()})).catch(()=>{});});
+function statView(){const y=UI.statJahr||new Date().getFullYear();const B=S.besuche.filter(b=>String(b.datum).slice(0,4)===String(y));
+  const jahre=[...new Set([new Date().getFullYear(),...S.besuche.map(b=>Number(String(b.datum).slice(0,4)))])].filter(Boolean).sort();
+  const names=[...new Set([...leistungen().map(l=>l.name),...B.flatMap(b=>b.leistungen||[])])];const M=[...Array(12)].map((_,i)=>i+1);
+  const cnt=(n,m)=>B.filter(b=>Number(String(b.datum).slice(5,7))===m&&(b.leistungen||[]).includes(n)).length;
+  const rows=names.map(n=>({n,v:M.map(m=>cnt(n,m))})).filter(r=>r.v.some(Boolean));
+  const besM=M.map(m=>B.filter(b=>Number(String(b.datum).slice(5,7))===m).length);
+  const top={};B.forEach(b=>{top[b.kundeId]=(top[b.kundeId]||0)+1});const topL=Object.entries(top).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const letzte={},anz={};S.besuche.forEach(b=>{anz[b.kundeId]=(anz[b.kundeId]||0)+1;if(!letzte[b.kundeId]||b.datum>letzte[b.kundeId])letzte[b.kundeId]=b.datum});
+  const zuk=new Set(S.termine.filter(t=>t.datum>=today()&&t.status!=='abgesagt').map(t=>t.kundeId));
+  const rueck=S.kunden.filter(k=>letzte[k.id]&&tageSeit(letzte[k.id])>56&&!zuk.has(k.id)).sort((a,b)=>letzte[a.id].localeCompare(letzte[b.id]));
+  const MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  return `<div class="view-head"><h1>Auswertung</h1><div class="actions">${jahre.map(j=>`<button class="btn sm" data-act="stat-jahr" data-v="${j}" aria-pressed="${j===y}" ${j===y?'style="background:var(--accent);color:#fff"':''}>${j}</button>`).join('')}<button class="btn" data-act="stat-close">‹ Zurück zu Kunden</button></div></div>
+  <div class="grid g3" style="margin-bottom:16px"><div class="card stat"><span class="label">Besuche ${y}</span><b>${B.length}</b></div><div class="card stat"><span class="label">Verschiedene Kunden</span><b>${Object.keys(top).length}</b></div><div class="card stat"><span class="label">Neue Kunden ${y}</span><b>${S.kunden.filter(k=>String(k.erstellt||'').slice(0,4)===String(y)).length}</b></div></div>
+  <div class="card"><h3>Leistungen pro Monat</h3>${B.length?`<div class="table-wrap"><table class="stat-tbl"><thead><tr><th>Leistung</th>${MN.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Summe</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.n)}</td>${r.v.map(v=>`<td class="num ${v?'':'muted'}">${v||'·'}</td>`).join('')}<td class="num"><b>${r.v.reduce((a,b)=>a+b,0)}</b></td></tr>`).join('')}<tr><td><b>Besuche</b></td>${besM.map(v=>`<td class="num"><b>${v||'·'}</b></td>`).join('')}<td class="num"><b>${B.length}</b></td></tr></tbody></table></div>`:'<div class="empty">Noch keine Besuche in diesem Jahr.</div>'}</div>
+  <div class="grid g2" style="margin-top:16px"><div class="card"><h3>Treueste Kunden ${y}</h3>${topL.length?`<div class="list">${topL.map(([id,n],i)=>{const k=kundeById(id);return `<div class="row click" data-act="kunde-sel" data-id="${id}"><span class="small muted" style="width:1.6em">${i+1}.</span><div class="grow"><div class="title">${esc(k?kundeName(k):'?')}</div></div><span class="pill">${n} Besuche</span></div>`}).join('')}</div>`:'<div class="empty">–</div>'}</div>
+  <div class="card"><h3>Lange nicht da (über 8 Wochen)</h3><p class="small muted" style="margin:0 0 6px">Ohne neuen Termin. Ein kurzer Gruß bringt viele wieder.</p>${rueck.length?`<div class="list">${rueck.slice(0,20).map(k=>`<div class="row"><div class="grow click" data-act="kunde-sel" data-id="${k.id}" style="cursor:pointer"><div class="title">${esc(kundeName(k))}</div><div class="small muted">zuletzt ${fmtDate(letzte[k.id])} · ${anz[k.id]} Besuche${k.rueckKontakt?' · angeschrieben '+fmtDate(k.rueckKontakt):''}</div></div>${waBtn(k.telefon,`Hallo ${k.vorname||kundeName(k)}, wir haben Sie lange nicht gesehen! Wenn Sie wieder einen Termin möchten, melden Sie sich gern. Liebe Grüße, ${salonName()}`,`data-wa="rueck" data-id="${k.id}"`)}</div>`).join('')}</div>`:'<div class="empty">Niemand – sehr gut!</div>'}</div>
+  <div class="card"><h3>Geburtstage – nächste 30 Tage</h3>${(()=>{const L=gebNaechste(30);return L.length?`<div class="list">${L.map(({k,in:n,datum})=>`<div class="row"><div class="grow"><div class="title">${esc(kundeName(k))}</div></div><span class="small muted">${n===0?'heute':fmtDate(datum)}</span></div>`).join('')}</div>`:'<div class="empty">Keine.</div>'})()}</div></div>`}
+function bestellListe(){const L=lowStock();const alle=S.artikel.slice().sort((a,b)=>(a.lieferant||'').localeCompare(b.lieferant||'','de')||(a.name||'').localeCompare(b.name||'','de'));
+  const vorschlag=a=>Math.max(1,Math.ceil(num(a.minBestand)*2-num(a.bestand)));
+  openModal('Bestellliste',`<p class="small muted" style="margin:0">Artikel unter Mindestbestand sind vorausgewählt. Mengen anpassen, dann über WhatsApp oder Mail teilen.</p>
+   <div class="list" id="bl-rows">${alle.map(a=>{const low=L.includes(a);return `<div class="row"><label class="check grow" style="align-items:center"><input type="checkbox" data-bl="${a.id}" ${low?'checked':''}><span><b>${esc(a.name)}</b><span class="small muted"> · ${esc([a.lieferant,a.marke].filter(Boolean).join(' · ')||'ohne Lieferant')} · Bestand ${fmtM(num(a.bestand))}${num(a.minBestand)?' / Min. '+num(a.minBestand):''}</span></span></label><input type="number" min="1" step="1" value="${low?vorschlag(a):1}" data-blm="${a.id}" style="width:80px" aria-label="Bestellmenge"><span class="small muted">${esc(a.einheit||'Stk')}</span></div>`}).join('')||'<div class="empty">Noch keine Artikel.</div>'}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Schließen</button><button class="btn primary" data-act="bestell-teilen">Teilen (WhatsApp / Mail)</button></div>`,{wide:true})}
+async function bestellTeilen(){const sel=$$('[data-bl]').filter(c=>c.checked).map(c=>{const a=S.artikel.find(x=>x.id===c.dataset.bl);const m=num($(`[data-blm="${c.dataset.bl}"]`).value)||1;return {a,m}}).filter(x=>x.a);
+  if(!sel.length){toast('Bitte mindestens einen Artikel auswählen.');return}
+  const g={};sel.forEach(x=>{const l=x.a.lieferant||'Ohne Lieferant';(g[l]=g[l]||[]).push(x)});
+  const txt=`Bestellung ${salonName()} – ${fmtDate(today())}\n`+Object.entries(g).map(([l,xs])=>`\n${l}:\n`+xs.map(({a,m})=>`• ${m} ${a.einheit||'Stk'} ${a.name}${a.marke&&!a.name.includes(a.marke)?' ('+a.marke+')':''}${a.ean?' – EAN '+a.ean:''}`).join('\n')).join('\n')+(S.settings.adresse?`\n\nLieferadresse: ${S.settings.firma||''}, ${S.settings.adresse}`:'');
+  try{if(navigator.share){await navigator.share({title:'Bestellung',text:txt});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(txt);toast('Bestellliste kopiert – in WhatsApp oder Mail einfügen.',4500)}catch(_){openModal('Bestellliste',`<textarea style="min-height:260px">${esc(txt)}</textarea>`)}}
+function quittungForm(kid){const k=kundeById(kid);const L=leistungen();
+  openModal('Quittung erstellen (ohne Buchung)',`<form data-form="quittung" class="grid" style="gap:12px">
+   <div class="notice info small">Für Kundinnen, die eine Quittung möchten (Kleinunternehmerin, ohne Umsatzsteuer). Wird <b>nicht</b> ins Kassenbuch gebucht – der Betrag ist schon in den Tageseinnahmen. Sobald das Kassensystem mit TSE da ist, kommt der Beleg von dort.</div>
+   <div class="field"><label for="q-kunde">Kunde</label><input id="q-kunde" name="kunde" list="dl-kunden" value="${esc(k?kundeLabel(k):'')}" autocomplete="off">${kundenDatalist()}</div>
+   <div class="field"><span class="label">Leistungen antippen</span><div class="chips" id="q-chips">${L.map(l=>`<button type="button" class="chip" data-act="chip" data-name="${esc(l.name)}" data-preis="${l.preis||0}" aria-pressed="false">${esc(l.name)}${l.preis?' · '+eur(l.preis):''}</button>`).join('')}</div></div>
+   <div class="fields"><div class="field"><label for="q-betrag">Betrag (€)</label><input id="q-betrag" name="betrag" inputmode="decimal" placeholder="0,00"></div>${fld('datum','Datum',today(),'date')}</div>
+   ${fld('text','Text (optional, sonst die Leistungen)','')}
+   <div class="field"><span class="label">Bezahlt</span><div class="seg" role="group">${[['bar','Bar'],['karte','Karte']].map(([v,l],i)=>`<button type="button" data-act="seg" data-name="zahlart" data-v="${v}" aria-pressed="${i===0}">${l}</button>`).join('')}</div><input type="hidden" name="zahlart" value="bar"></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Quittung erstellen</button></div></form>`)}
+
 /* ================= Serien-Scan: Wareneingang / Verbrauch ================= */
 function serieStart(mode,beleg){UI.serie={mode,beleg:beleg||'',items:[]};UI.lastBooking=null;go('lager')}
 function serieAdd(id,d=1){const it=UI.serie.items.find(x=>x.id===id);if(it)it.menge=Math.max(0,Math.round((it.menge+d)*1000)/1000);else if(d>0)UI.serie.items.unshift({id,menge:d})}
@@ -1508,7 +1715,7 @@ const recoveryCode=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const a=crypt
 
 /* ================= Monatsabschluss als PDF ================= */
 function monatsPDF(ym){
-  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});const s=S.settings;let y=18;const x=16,W=210;
+  const doc=newPdf({unit:'mm',format:'a4'});const s=S.settings;let y=18;const x=16,W=210;
   const sm=stornoMap();const L=S.kasse.filter(k=>ymOf(k.datum)===ym);const jahr=ym.slice(0,4);
   const agg=(list,art)=>{const m={};list.filter(k=>k.art===art&&!isPrivat(k)).forEach(k=>{m[k.kategorie]=(m[k.kategorie]||0)+k.betrag});return m};
   const sum=o=>Object.values(o).reduce((a,b)=>a+b,0);
