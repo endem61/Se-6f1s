@@ -167,6 +167,10 @@ tr.storno td{color:var(--muted);text-decoration:line-through}
 .stat-tbl td,.stat-tbl th{padding:6px 8px;font-size:.85rem;white-space:nowrap}
 .warnlist{display:grid;gap:6px}
 a.btn{text-decoration:none}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.gal img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;cursor:pointer;background:var(--surface2)}
+.gal .cap{font-size:.78rem;color:var(--muted);margin-top:3px}
+.lockbox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface2);border-radius:10px;padding:10px 12px;font-size:.9rem}
 .big-in{font-size:1.6rem!important;font-weight:700;min-height:60px!important;font-variant-numeric:tabular-nums}
 .pos-display{background:var(--surface2);border-radius:14px;padding:14px 18px;text-align:right}
 #pos-amount{font-size:3rem;font-weight:700;line-height:1.1;letter-spacing:-.02em}
@@ -222,6 +226,7 @@ a.btn{text-decoration:none}
 <nav class="tabs" aria-label="Bereiche"><div class="in" id="nav"></div></nav>
 <div id="scan-reader"></div>
 <input type="file" id="scan-input" accept="image/*" capture="environment" hidden>
+<input type="file" id="foto-view-input" accept="image/*" multiple hidden>
 <input type="file" id="art-foto-input" accept="image/*" capture="environment" hidden>
 <input type="file" id="beleg-input" accept="image/*,application/pdf" multiple hidden>
 <div class="toast" id="toast" hidden></div>
@@ -536,7 +541,10 @@ function kundeDetail(k){
   const besuche=S.besuche.filter(b=>b.kundeId===k.id).sort((a,b)=>b.datum.localeCompare(a.datum));
   const naechster=S.termine.filter(t=>t.kundeId===k.id&&t.datum>=today()&&t.status!=='abgesagt').sort((a,b)=>(a.datum+a.zeit).localeCompare(b.datum+b.zeit))[0];
   const umsatz=S.kasse.filter(e=>e.kundeId===k.id&&e.art==='einnahme').reduce((s,e)=>s+e.betrag,0);
-  return `<button class="btn sm back-btn" data-act="kunde-back" style="margin-bottom:10px">‹ Alle Kunden</button>
+  const nF=besuche.reduce((a,b)=>a+(b.fotos||[]).length,0);const tab=UI.kundeTab==='fotos'?'fotos':'info';
+  const tabs=`<div class="seg" role="group" style="margin-bottom:12px"><button data-act="kunde-tab" data-v="info" aria-pressed="${tab==='info'}">Kundenkarte</button><button data-act="kunde-tab" data-v="fotos" aria-pressed="${tab==='fotos'}">Fotos (${nF})${k.fotoSchutz?' 🔒':''}</button></div>`;
+  if(tab==='fotos')return `<button class="btn sm back-btn" data-act="kunde-back" style="margin-bottom:10px">‹ Alle Kunden</button>${tabs}${fotoGalerie(k,besuche)}`;
+  return `<button class="btn sm back-btn" data-act="kunde-back" style="margin-bottom:10px">‹ Alle Kunden</button>${tabs}
   <div class="card"><div class="view-head" style="margin-bottom:8px"><div><h2>${esc(kundeName(k))}</h2><div class="small muted">${esc([k.telefon,k.email].filter(Boolean).join(' · '))}</div></div>
    <div class="actions"><button class="btn primary" data-act="besuch-neu" data-id="${k.id}">+ Besuch</button><button class="btn" data-act="termin-neu" data-kunde="${k.id}">+ Termin</button><button class="btn" data-act="q-neu" data-kunde="${k.id}">Quittung</button><button class="btn" data-act="kunde-edit" data-id="${k.id}">Bearbeiten</button></div></div>
    <div class="grid g3" style="gap:10px;margin-bottom:6px">
@@ -544,11 +552,11 @@ function kundeDetail(k){
     <div><div class="label">Nächster Termin</div><b>${naechster?fmtDate(naechster.datum)+' '+esc(naechster.zeit):'–'}</b></div></div>
    ${k.geburtstag?`<div class="small">Geburtstag: ${fmtDate(k.geburtstag)}</div>`:''}${k.adresse?`<div class="small">Anschrift: ${esc(k.adresse)}</div>`:''}
    ${k.notiz?`<div class="notice info" style="margin-top:8px">${esc(k.notiz)}</div>`:''}
-   <div class="small" style="margin-top:8px">${k.fotoEinwilligung?`<span class="pill ok">Foto-Einwilligung seit ${fmtDate(k.einwilligungDatum)}</span>`:'<span class="pill warn">Keine Foto-Einwilligung</span>'}</div></div>
+   <div class="small" style="margin-top:8px">${k.fotoEinwilligung?`<span class="pill ok">Foto-Einwilligung seit ${fmtDate(k.einwilligungDatum)}</span>`:'<span class="pill warn">Keine Foto-Einwilligung</span>'} ${k.fotoSchutz?'<span class="pill acc">🔒 Fotos geschützt</span>':''} ${k.werbung?`<span class="pill ok">Instagram/Werbung erlaubt seit ${fmtDate(k.werbung)}</span>`:'<span class="pill">Keine Werbe-Einwilligung</span>'}</div></div>
   ${gesundheitCard(k)}
   <div class="card" style="margin-top:16px"><h3>Besuche & Arbeiten</h3>${besuche.length?besuche.map(b=>`<div class="visit"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${fmtDate(b.datum)}${b.zeit?' · '+esc(b.zeit):''}</b><span class="num">${b.betrag?eur(b.betrag):''} <button class="btn sm" data-act="besuch-edit" data-kunde="${k.id}" data-id="${b.id}">Bearbeiten</button></span></div>
     <div>${esc((b.leistungen||[]).join(', '))}</div>${b.rezeptur?`<div class="recipe">${esc(b.rezeptur)}</div>`:''}${(b.material||[]).length?`<div class="small">Material: ${b.material.map(m=>esc(m.name)+' '+(m.ml!=null?fmtM(m.ml)+' '+esc(m.eh||'ml'):fmtM(m.menge)+' '+esc(m.eh||'Stk'))).join(' + ')}</div>`:''}${b.notiz?`<div class="small muted">${esc(b.notiz)}</div>`:''}
-    ${(b.fotos||[]).length?`<div class="thumbs">${b.fotos.map(id=>`<img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Noch keine Besuche erfasst.</div>'}</div>`;
+    ${(b.fotos||[]).length?(fotoFrei(k)?`<div class="thumbs">${b.fotos.map(id=>`<img class="thumb" data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy">`).join('')}</div>`:`<div class="lockbox">🔒 ${b.fotos.length} geschützte${b.fotos.length>1?'':'s'} Foto${b.fotos.length>1?'s':''}<button class="btn sm" data-act="foto-frei" data-id="${k.id}">Mit PIN anzeigen</button></div>`):''}</div>`).join(''):'<div class="empty">Noch keine Besuche erfasst.</div>'}</div>`;
 }
 
 function kasseBuch(){
@@ -698,6 +706,8 @@ function kundeForm(k={}){
    ${fld('vorname','Vorname',k.vorname)}${fld('nachname','Nachname',k.nachname)}${fld('telefon','Telefon',k.telefon,'tel')}${fld('email','E-Mail',k.email,'email')}${fld('geburtstag','Geburtstag',k.geburtstag,'date')}${fld('adresse','Anschrift (für Rechnungen über 250 €)',k.adresse)}</div>
    <div class="field"><label for="f-notiz">Notizen (Haartyp, Wünsche, Unverträglichkeiten)</label><textarea id="f-notiz" name="notiz">${esc(k.notiz||'')}</textarea></div>
    <label class="check"><input type="checkbox" name="fotoEinwilligung" ${k.fotoEinwilligung?'checked':''}><span>Die Kundin / der Kunde ist einverstanden, dass Vorher-/Nachher-Fotos zur Dokumentation gespeichert werden (DSGVO-Einwilligung).</span></label>
+   <label class="check"><input type="checkbox" name="fotoSchutz" ${k.fotoSchutz?'checked':''}><span><b>Fotos besonders schützen</b> (z. B. Kundin mit Kopftuch / aus religiösen Gründen): Die Fotos sind verdeckt und erscheinen erst nach Eingabe der PIN.</span></label>
+   <div class="notice info small">Info für alle Kundinnen: Fotos bleiben nur auf diesem iPad (und in der verschlüsselten Sicherung) und werden nicht weitergegeben. Für Werbung auf Instagram braucht es eine eigene, unterschriebene Einwilligung.</div>
    <div class="modal-foot">${k.id?'<button type="button" class="btn danger" data-act="kunde-del" data-id="'+k.id+'" style="margin-right:auto">Kundenkarte löschen</button>':''}<button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Speichern</button></div></form>`);
 }
 
@@ -966,8 +976,8 @@ const ACT={
  'besuch-aus-termin':el=>{const t=S.termine.find(x=>x.id===el.dataset.id);if(!t)return;if(!t.kundeId){toast('Für diesen Termin gibt es noch keine Kundenkarte – bitte zuerst anlegen.',4000);kundeForm({vorname:t.name||''});return}besuchForm(t.kundeId,{},t)},
  /* Kunden */
  'kunde-neu':()=>kundeForm(),
- 'kunde-sel':el=>{UI.kundeSel=el.dataset.id;renderBody();if(window.innerWidth<900)window.scrollTo(0,0)},
- 'kunde-back':()=>{UI.kundeSel=null;renderBody()},
+ 'kunde-sel':el=>{if(UI.kundeSel!==el.dataset.id){UI.kundeTab='info';UI.fotoFrei=null}UI.kundeSel=el.dataset.id;renderBody();if(window.innerWidth<900)window.scrollTo(0,0)},
+ 'kunde-back':()=>{UI.kundeSel=null;UI.fotoFrei=null;renderBody()},
  'kunde-edit':el=>kundeForm(kundeById(el.dataset.id)),
  'kunde-del':el=>{const k=kundeById(el.dataset.id);confirmBox('Kundenkarte löschen',`Kundenkarte von <b>${esc(kundeName(k))}</b> mit allen Besuchen und Fotos endgültig löschen? Buchungen im Kassenbuch bleiben aus rechtlichen Gründen erhalten.`,'Endgültig löschen',async()=>{
    const fotos=S.besuche.filter(b=>b.kundeId===k.id).flatMap(b=>b.fotos||[]);
@@ -989,6 +999,13 @@ const ACT={
  'scan-lager':()=>startScan(lookupEan),
  'art-foto':el=>{artFotoZiel=el.dataset.id;const i=$('#art-foto-input');i.value='';i.click()},
  'erkl-neu':el=>erklaerungForm(kundeById(el.dataset.id)),
+ 'werbung-neu':el=>werbungForm(kundeById(el.dataset.id)),
+ 'werbung-widerruf':el=>{const k=kundeById(el.dataset.id);confirmBox('Werbe-Einwilligung widerrufen','Die Kundin widerruft die Einwilligung für Instagram/Werbung. Bereits veröffentlichte Beiträge bitte selbst löschen.','Widerrufen',async()=>{await mutate('kunden/'+k.id,x=>({...x,werbung:'',werbungKanaele:'',erklaerungen:[...(x.erklaerungen||[]),{id:uid(),typ:'werbung-widerruf',datum:today(),pdf:'',name:''}]}));toast('Widerruf gespeichert')})},
+ 'kunde-tab':el=>{UI.kundeTab=el.dataset.v;renderBody()},
+ 'foto-frei':el=>fotoFreiForm(el.dataset.id),
+ 'foto-sperren':()=>{UI.fotoFrei=null;renderBody()},
+ 'foto-onedrive':el=>fotosExport(el.dataset.id),
+ 'foto-ansehen':()=>{const i=$('#foto-view-input');i.value='';i.click()},
  'wlan-neu':el=>wlanForm(kundeById(el.dataset.id)),
  'atest':el=>allergieTestForm(kundeById(el.dataset.id)),
  'erkl-send':async el=>{await pdfSenden(el.dataset.bid,el.dataset.name,kundeById(el.dataset.kunde))},
@@ -1113,7 +1130,7 @@ const FORMS={
    await mutate('settings/main',d=>({...d,leistungen:rows}));toast('Leistungen gespeichert')},
  async kunde(f){const v=Object.fromEntries(new FormData(f));if(!v.vorname.trim()&&!v.nachname.trim()){toast('Bitte einen Namen eingeben.');return false}
    const id=f.dataset.id||uid();const old=kundeById(id)||{};const ein=!!v.fotoEinwilligung;
-   const data={vorname:v.vorname.trim(),nachname:v.nachname.trim(),telefon:v.telefon.trim(),email:v.email.trim(),geburtstag:v.geburtstag,adresse:v.adresse.trim(),notiz:v.notiz.trim(),fotoEinwilligung:ein,einwilligungDatum:ein?(old.einwilligungDatum||today()):'',erstellt:old.erstellt||new Date().toISOString()};
+   const data={vorname:v.vorname.trim(),nachname:v.nachname.trim(),telefon:v.telefon.trim(),email:v.email.trim(),geburtstag:v.geburtstag,adresse:v.adresse.trim(),notiz:v.notiz.trim(),fotoSchutz:!!v.fotoSchutz,fotoEinwilligung:ein,einwilligungDatum:ein?(old.einwilligungDatum||today()):'',erstellt:old.erstellt||new Date().toISOString()};
    const keep={...old};delete keep.id;await db.doc('kunden/'+id).set({...keep,...data});UI.kundeSel=id;if(UI.view!=='kunden')go('kunden');toast('Kundenkarte gespeichert')},
  async termin(f){const v=Object.fromEntries(new FormData(f));const k=kundeFromLabel(v.kunde);
    if(!v.kunde.trim()){toast('Bitte einen Namen eingeben.');return false}
@@ -1210,6 +1227,19 @@ const FORMS={
       <div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button><button class="btn primary" data-act="erkl-send" data-bid="${r.id}" data-name="${esc(name)}" data-kunde="${k.id}">Kopie senden (Mail)</button></div>`);
    }catch(e){console.error(e);btn.disabled=false;btn.textContent='Unterschreiben & speichern';toast('Speichern fehlgeschlagen.',4000)}
    return false},
+ async werbung(f){const k=kundeById(f.dataset.kunde);if(!k)return false;const v=Object.fromEntries(new FormData(f));const kan=new FormData(f).getAll('kanal');
+   if(!v.ok){toast('Bitte das Häkchen setzen lassen.');return false}if(!kan.length){toast('Bitte mindestens einen Kanal wählen.');return false}if(!sig.drawn){toast('Bitte unterschreiben lassen.',3500);return false}
+   if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return false}const btn=f.querySelector('button.primary');btn.disabled=true;const d=today();
+   try{const pdf=erklaerungPDF(k,{datum:d},{typ:'werbung',kanaele:kan},sigJpeg());const r=await assets.upload(pdf,{type:'application/pdf'});
+     const name='Werbung_'+(kundeName(k)||'Kunde').replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,'_')+'_'+d+'.pdf';
+     await mutate('kunden/'+k.id,x=>({...x,werbung:d,werbungKanaele:kan.join(', '),erklaerungen:[...(x.erklaerungen||[]),{id:uid(),typ:'werbung',datum:d,pdf:r.id,name}]}));
+     openModal('Einwilligung gespeichert',`<p style="margin:0">Fotos dieser Kundin dürfen für <b>${esc(kan.join(', '))}</b> verwendet werden.</p><div class="modal-foot"><button class="btn" data-act="close-modal">Fertig</button><button class="btn primary" data-act="erkl-send" data-bid="${r.id}" data-name="${esc(name)}" data-kunde="${k.id}">Kopie senden (Mail)</button></div>`);
+   }catch(e){console.error(e);btn.disabled=false;toast('Speichern fehlgeschlagen.',4000)}return false},
+ async fotofrei(f){const pin=f.querySelector('[name=pin]').value;if(!/^\d{4,}$/.test(pin)){toast('Bitte die PIN eingeben.');return false}
+   const L=users();let ok=false;for(const u of L){if(await pwHash(pin,u.salt)===u.hash){ok=true;break}}
+   if(!L.length&&S.settings.pinHash)ok=await pinHash(pin)===S.settings.pinHash;
+   if(!ok){toast('Falsche PIN.');f.querySelector('[name=pin]').value='';return false}
+   UI.fotoFrei={id:f.dataset.id,until:Date.now()+5*60000};hideModal();renderShell();toast('Fotos 5 Minuten sichtbar');setTimeout(()=>{if(UI.fotoFrei&&Date.now()>=UI.fotoFrei.until){UI.fotoFrei=null;renderBody()}},5*60000+500);return false},
  async wlan(f){const k=kundeById(f.dataset.kunde);if(!k)return false;const v=Object.fromEntries(new FormData(f));
    if(!v.ok){toast('Bitte das Häkchen setzen lassen.');return false}if(!sig.drawn){toast('Bitte unterschreiben lassen.',3500);return false}
    if(!window.jspdf){toast('PDF-Erzeugung nicht geladen.');return false}
@@ -1376,7 +1406,7 @@ const waLink=(tel,text)=>{const n=telWa(tel);return n?`https://wa.me/${n}?text=$
 const waBtn=(tel,text,attrs='',label='WhatsApp')=>{const l=waLink(tel,text);return l?`<a class="btn sm ok" href="${l}" target="_blank" rel="noopener" ${attrs}>${label}</a>`:'<span class="small muted">keine Handynummer</span>'};
 const tageSeit=d=>Math.round((parseDate(today())-parseDate(d))/864e5);
 function alterVon(g){if(!g)return null;const b=parseDate(g),t=parseDate(today());let a=t.getFullYear()-b.getFullYear();if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))a--;return a}
-const letzteErkl=k=>(k.erklaerungen||[]).filter(e=>e.typ!=='wlan').slice().sort((a,b)=>a.datum<b.datum?1:-1)[0];
+const letzteErkl=k=>(k.erklaerungen||[]).filter(e=>!e.typ||e.typ==='gesundheit').slice().sort((a,b)=>a.datum<b.datum?1:-1)[0];
 function gesundheit(k){const w=[];if(!k)return w;const an=k.anamnese,at=k.allergietest;
   if(an&&(an.reaktion||an.henna||an.kopfhaut||an.allergien))w.push({cls:'bad',txt:'Achtung: '+[an.reaktion&&'frühere Reaktion auf Haarfarbe',an.henna&&'Tattoo mit schwarzem Henna',an.kopfhaut&&'Kopfhaut verletzt / Ekzem',an.allergien&&'Allergien'].filter(Boolean).join(', ')+(an.text?' – '+an.text:'')});
   if(at&&at.ergebnis==='reaktion')w.push({cls:'bad',txt:'Allergietest vom '+fmtDate(at.datum)+': REAKTION – nicht mit diesem Produkt färben'+(at.produkt?' ('+at.produkt+')':'')});
@@ -1393,18 +1423,18 @@ function vbWarn(a){if(!a||a.kategorie!=='Haarfarbe')return;const f=$('form[data-
   if(bad.length)toast('⚠ '+bad[0].txt,6000);else if(w.length)toast('Hinweis: '+w[0].txt,4500)}
 function gesundheitCard(k){const w=gesundheit(k);const an=k.anamnese,at=k.allergietest;const erk=(k.erklaerungen||[]).slice().sort((a,b)=>a.datum<b.datum?1:-1);
   const ATL={ok:'unauffällig',reaktion:'REAKTION',abgelehnt:'abgelehnt'};
-  return `<div class="card" style="margin-top:16px"><div class="view-head" style="margin-bottom:8px"><h3 style="margin:0">Gesundheit & Formulare</h3><div class="actions"><button class="btn primary sm" data-act="erkl-neu" data-id="${k.id}">Fragebogen & Unterschrift</button><button class="btn sm" data-act="atest" data-id="${k.id}">Allergietest eintragen</button><button class="btn sm" data-act="wlan-neu" data-id="${k.id}">Gäste-WLAN</button></div></div>
+  return `<div class="card" style="margin-top:16px"><div class="view-head" style="margin-bottom:8px"><h3 style="margin:0">Gesundheit & Formulare</h3><div class="actions"><button class="btn primary sm" data-act="erkl-neu" data-id="${k.id}">Fragebogen & Unterschrift</button><button class="btn sm" data-act="atest" data-id="${k.id}">Allergietest eintragen</button><button class="btn sm" data-act="wlan-neu" data-id="${k.id}">Gäste-WLAN</button><button class="btn sm" data-act="werbung-neu" data-id="${k.id}">Instagram / Werbung</button></div></div>
    ${w.length?warnBox(k):'<span class="pill ok">Alles aktuell</span>'}
    <div class="grid g3" style="gap:10px;margin-top:10px"><div><div class="label">Gesundheitsfragen</div><b>${an&&an.datum?fmtDate(an.datum):'–'}</b></div>
     <div><div class="label">Allergietest</div><b>${at&&at.datum?fmtDate(at.datum)+' · '+(ATL[at.ergebnis]||''):'–'}</b>${at&&at.produkt?`<div class="small muted">${esc(at.produkt)}</div>`:''}</div>
     <div><div class="label">Gäste-WLAN</div><b>${k.wlan?'Bedingungen akzeptiert '+fmtDate(k.wlan):'–'}</b></div></div>
-   ${erk.length?`<div class="list" style="margin-top:8px">${erk.map(e=>`<div class="row"><div class="grow"><div class="title">${e.typ==='wlan'?'WLAN-Nutzungsbedingungen':'Gesundheitsfragen & Einverständnis'}</div><div class="small muted">unterschrieben am ${fmtDate(e.datum)}</div></div><a class="btn sm" href="#" data-bid-open="${e.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${e.pdf}" data-name="${esc(e.name||'Einverstaendnis.pdf')}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
+   ${erk.length?`<div class="list" style="margin-top:8px">${erk.map(e=>`<div class="row"><div class="grow"><div class="title">${e.typ==='wlan'?'WLAN-Nutzungsbedingungen':e.typ==='werbung'?'Einwilligung Instagram / Werbung':e.typ==='werbung-widerruf'?'Widerruf Werbung':'Gesundheitsfragen & Einverständnis'}</div><div class="small muted">unterschrieben am ${fmtDate(e.datum)}</div></div><a class="btn sm" href="#" data-bid-open="${e.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${e.pdf}" data-name="${esc(e.name||'Einverstaendnis.pdf')}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
    ${(k.quittungen||[]).length?`<div class="label" style="margin-top:12px">Quittungen</div><div class="list">${k.quittungen.slice().reverse().map(q=>`<div class="row"><div class="grow"><div class="title">${esc(q.nr)}</div><div class="small muted">${fmtDate(q.datum)}</div></div><span class="num">${eur(q.betrag)}</span><a class="btn sm" href="#" data-bid-open="${q.pdf}">PDF</a><button class="btn sm" data-act="erkl-send" data-bid="${q.pdf}" data-name="${esc(q.name)}" data-kunde="${k.id}">Senden</button></div>`).join('')}</div>`:''}
   </div>`}
 const RECHT_HAAR='Oxidative Haarfärbemittel können schwere allergische Reaktionen hervorrufen. Sie sind nicht für Personen unter 16 Jahren bestimmt. Temporäre Tätowierungen mit "schwarzem Henna" können das Allergierisiko erhöhen (Pflicht-Warnhinweise nach Verordnung (EG) Nr. 1223/2009, Anhang III). Die Hersteller empfehlen vor jeder Färbung einen Hautverträglichkeitstest (Allergietest), der 48 Stunden vor der Anwendung durchgeführt wird.';
 const RECHT_BESTAET='Ich habe die Fragen wahrheitsgemäß beantwortet und informiere den Salon, wenn sich an meinen Angaben etwas ändert. Mir wurde ein Allergietest angeboten. Verzichte ich darauf, geschieht dies auf eigene Verantwortung.';
 function datenschutzText(){const s=S.settings;return `Verantwortlich: ${[s.firma||'SEEN Salon',s.inhaber,s.adresse].filter(Boolean).join(', ')}. Wir speichern Ihre Kontaktdaten (Name, Telefon, E-Mail, Geburtstag), Termine, durchgeführte Leistungen und Farbrezepturen, um Sie fachgerecht zu bedienen (Art. 6 Abs. 1 lit. b DSGVO). Ihre Angaben zu Allergien und Verträglichkeit speichern wir nur mit Ihrer ausdrücklichen Einwilligung, um gesundheitliche Schäden zu vermeiden (Art. 9 Abs. 2 lit. a DSGVO). Die Daten liegen auf dem Salon-iPad und in passwortgeschützten Sicherungskopien des Salons; sie werden nicht an Dritte weitergegeben und gelöscht, wenn sie nicht mehr benötigt werden und keine Aufbewahrungspflicht besteht. Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung sowie auf Beschwerde beim Landesbeauftragten für Datenschutz Baden-Württemberg. Eine Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen.`}
-const FOTO_TEXT='Ich bin einverstanden, dass Vorher-/Nachher-Fotos meiner Frisur zur Dokumentation in meiner Kundenkarte gespeichert werden. Eine Veröffentlichung (z. B. Internet, soziale Medien) erfolgt nur mit meiner gesonderten Zustimmung. Ich kann die Einwilligung jederzeit widerrufen; die Fotos werden dann gelöscht.';
+const FOTO_TEXT='Ich bin einverstanden, dass Vorher-/Nachher-Fotos meiner Frisur zur Dokumentation in meiner Kundenkarte gespeichert werden. Die Fotos bleiben ausschließlich auf dem Salon-iPad und in den passwortgeschützten Sicherungskopien des Salons; sie werden nicht gezeigt, weitergegeben oder veröffentlicht. Eine Verwendung für Werbung (z. B. Instagram) erfolgt nur mit meiner gesonderten, unterschriebenen Einwilligung. Ich kann die Einwilligung jederzeit widerrufen; die Fotos werden dann gelöscht.';
 function wlanText(){const s=S.settings;return `Der Salon stellt seinen Gästen kostenlos einen WLAN-Gastzugang${s.wlanSsid?' ("'+s.wlanSsid+'")':''} zur Verfügung – ohne Gewähr für Verfügbarkeit, Geschwindigkeit oder Sicherheit. Die Nutzung erfolgt auf eigene Verantwortung. Der Gast verpflichtet sich, den Zugang nicht für rechtswidrige Zwecke zu nutzen, insbesondere keine urheberrechtlich geschützten Werke herunterzuladen oder anzubieten (z. B. Filesharing/Tauschbörsen), keine strafbaren, jugendgefährdenden oder beleidigenden Inhalte abzurufen oder zu verbreiten und keine Dritten zu belästigen. Für Rechtsverstöße, die über den Zugang begangen werden, ist allein der Gast verantwortlich; er stellt den Salon von daraus entstehenden Ansprüchen Dritter frei. Der Salon haftet nicht für Schäden an Endgeräten, Datenverlust oder Viren, außer bei Vorsatz oder grober Fahrlässigkeit. Der Zugang kann jederzeit ohne Angabe von Gründen gesperrt werden. Die Zugangsdaten dürfen nicht an Dritte weitergegeben werden.`}
 const FRAGEN=[['reaktion','Hatten Sie schon einmal eine Reaktion auf Haarfarbe (Juckreiz, Rötung, Schwellung, Brennen)?'],['henna','Hatten Sie jemals ein (Urlaubs-)Tattoo mit „schwarzem Henna“?'],['kopfhaut','Ist Ihre Kopfhaut derzeit gereizt, verletzt, entzündet oder haben Sie ein Ekzem / Sonnenbrand?'],['allergien','Haben Sie bekannte Allergien (z. B. gegen Kosmetik, Duftstoffe, Nickel, Latex)?']];
 let sig={drawn:false};
@@ -1420,6 +1450,37 @@ function erklaerungForm(k){if(!k)return;const an=k.anamnese||{};
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Unterschreiben & speichern</button></div></form>`,
   {wide:true,onMount:m=>sigInit($('#sigpad',m))});
 }
+function fotoFrei(k){return !k.fotoSchutz||(UI.fotoFrei&&UI.fotoFrei.id===k.id&&Date.now()<UI.fotoFrei.until)}
+function fotoFreiForm(id){openModal('Geschützte Fotos anzeigen',`<form data-form="fotofrei" data-id="${id}" class="grid" style="gap:12px"><p class="small muted" style="margin:0">Diese Fotos sind besonders geschützt. Bitte PIN eingeben – die Fotos sind dann 5 Minuten sichtbar.</p>
+   <input type="password" name="pin" inputmode="numeric" autocomplete="off" placeholder="PIN" style="font-size:1.4rem;text-align:center;letter-spacing:.4em" aria-label="PIN">
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Anzeigen</button></div></form>`,{onMount:m=>setTimeout(()=>m.querySelector('[name=pin]').focus(),50)})}
+function fotoGalerie(k,besuche){const L=besuche.filter(b=>(b.fotos||[]).length);const n=L.reduce((a,b)=>a+b.fotos.length,0);const frei=fotoFrei(k);
+  const head=`<div class="view-head" style="margin-bottom:10px"><div><h2 style="margin:0">Fotos – ${esc(kundeName(k))}</h2><div class="small muted">${n} Fotos aus ${L.length} Besuchen · bleiben nur auf diesem iPad</div></div><div class="actions">${k.fotoSchutz&&frei?'<button class="btn sm" data-act="foto-sperren">🔒 Wieder verdecken</button>':''}${n&&frei?`<button class="btn sm" data-act="foto-onedrive" data-id="${k.id}">In OneDrive sichern</button>`:''}<button class="btn sm" data-act="foto-ansehen">Aus OneDrive ansehen</button></div></div>`;
+  if(!n)return `<div class="card">${head}<div class="empty">Noch keine Fotos. Fotos werden beim Besuch erfasst (+ Besuch).</div></div>`;
+  if(!frei)return `<div class="card">${head}<div class="lockbox" style="padding:24px;justify-content:center">🔒 ${n} geschützte Fotos <button class="btn primary" data-act="foto-frei" data-id="${k.id}">Mit PIN anzeigen</button></div></div>`;
+  return `<div class="card">${head}${L.map(b=>`<div style="margin-top:12px"><div class="label">${fmtDate(b.datum)}${(b.leistungen||[]).length?' · '+esc(b.leistungen.join(', ')):''}</div><div class="gal" style="margin-top:6px">${b.fotos.map(id=>`<div><img data-bid="${id}" src="${blobUrl(id)}" alt="Foto vom ${fmtDate(b.datum)}" data-act="foto" data-id="${id}" loading="lazy"></div>`).join('')}</div>${b.rezeptur?`<div class="recipe" style="margin-top:6px">${esc(b.rezeptur)}</div>`:''}</div>`).join('')}</div>`}
+async function fotosExport(id){const k=kundeById(id);if(!k)return;const L=S.besuche.filter(b=>b.kundeId===id&&(b.fotos||[]).length);const base=(kundeName(k)||'Kunde').replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,'_');
+  const go=async()=>{const files=[];for(const b of L){let i=1;for(const fid of b.fotos){const r=await IDB.get('blobs',fid);if(r&&r.blob)files.push(new File([r.blob],`${base}_${b.datum}_${i++}.jpg`,{type:r.blob.type||'image/jpeg'}))}}
+    if(!files.length){toast('Keine Fotos gefunden.');return}
+    try{if(navigator.canShare&&navigator.canShare({files})){await navigator.share({files,title:'Fotos '+kundeName(k)});return}}catch(e){if(e&&e.name==='AbortError')return}
+    for(const f of files)await saveFile(f.name,f)};
+  if(k.fotoSchutz)confirmBox('Geschützte Fotos','Diese Kundin hat besonderen Fotoschutz. Die Kopien in OneDrive sind dort nicht verschlüsselt. Nur in einen privaten Ordner speichern (z. B. OneDrive › Salon-Fotos › '+base+').','Trotzdem sichern',go);
+  else{toast('Im Teilen-Menü „In Dateien sichern“ → OneDrive › Salon-Fotos › '+base+' wählen.',5000);await go()}}
+$('#foto-view-input').addEventListener('change',ev=>{const fs=[...(ev.target.files||[])];if(!fs.length)return;const urls=fs.map(f=>URL.createObjectURL(f));
+  openModal('Fotos aus OneDrive (nur ansehen)',`<p class="small muted" style="margin:0">Die Fotos werden nur angezeigt und nicht auf dem iPad gespeichert.</p><div class="gal">${urls.map((u,i)=>`<div><img src="${u}" alt="Foto ${i+1}"><div class="cap">${esc(fs[i].name)}</div></div>`).join('')}</div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Schließen</button></div>`,{wide:true});
+  setTimeout(()=>urls.forEach(u=>{}),0)});
+const KANAELE=['Instagram','Facebook','WhatsApp-Status','Website','Aushang im Salon'];
+function werbungText(kan){const s=S.settings;return `Ich willige ein, dass ${s.firma||'SEEN Salon'}${s.inhaber?' ('+s.inhaber+')':''} Fotos meiner Frisur, die im Salon aufgenommen wurden, für Werbezwecke auf folgenden Kanälen veröffentlichen darf: ${(kan||[]).join(', ')}. Mein Name wird dabei nicht genannt, außer ich wünsche es ausdrücklich. Ich weiß, dass im Internet veröffentlichte Bilder weltweit abrufbar sind und von Dritten kopiert werden können. Die Einwilligung ist freiwillig und kann jederzeit ohne Angabe von Gründen mit Wirkung für die Zukunft widerrufen werden (Art. 7 Abs. 3 DSGVO); der Salon löscht dann die eigenen Beiträge mit meinen Fotos. Ohne diese Einwilligung werden keine Fotos von mir veröffentlicht.`}
+function werbungForm(k){if(!k)return;
+  openModal('Einwilligung Instagram / Werbung – '+kundeName(k),`<form data-form="werbung" data-kunde="${k.id}" class="grid" style="gap:14px">
+   ${k.fotoSchutz?'<div class="notice" style="background:var(--bad-soft)"><b>Achtung:</b> Für diese Kundin ist „Fotos besonders schützen“ eingetragen. Bitte nur ausfüllen, wenn sie es ausdrücklich möchte.</div>':''}
+   ${k.werbung?`<div class="notice ok small">Bereits erteilt am ${fmtDate(k.werbung)} (${esc(k.werbungKanaele||'')}). <button type="button" class="btn sm danger" data-act="werbung-widerruf" data-id="${k.id}">Widerruf eintragen</button></div>`:''}
+   <div class="field"><span class="label">Wo dürfen die Fotos gezeigt werden?</span><div class="chips">${KANAELE.map((c,i)=>`<label class="chip" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="kanal" value="${c}" ${i===0?'checked':''} style="accent-color:var(--accent)">${c}</label>`).join('')}</div></div>
+   <div class="legaltxt" style="max-height:none">${esc(werbungText(['…']))}</div>
+   <label class="check"><input type="checkbox" name="ok"><span>Ich habe den Text gelesen und willige ein.</span></label>
+   <div class="field"><span class="label">Unterschrift Kundin / Kunde</span><canvas id="sigpad" class="sigpad" aria-label="Unterschriftsfeld"></canvas><div style="display:flex;justify-content:flex-end"><button type="button" class="btn sm" data-act="sig-clear">Unterschrift löschen</button></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Unterschreiben & speichern</button></div></form>`,
+  {wide:true,onMount:m=>sigInit($('#sigpad',m))})}
 function wlanForm(k){if(!k)return;
   openModal('Gäste-WLAN – '+kundeName(k),`<form data-form="wlan" data-kunde="${k.id}" class="grid" style="gap:14px">
    <div class="field"><span class="label">Nutzungsbedingungen</span><div class="legaltxt" style="max-height:none">${esc(wlanText())}</div></div>
@@ -1435,15 +1496,16 @@ function sigInit(c){sig={drawn:false,c};const r=c.getBoundingClientRect();const 
   const up=()=>{down=false};c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up)}
 function sigJpeg(){const c=sig.c;const w=600,h=Math.round(600*c.height/c.width);const o=document.createElement('canvas');o.width=w;o.height=h;const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(c,0,0,w,h);return o.toDataURL('image/jpeg',.85)}
 function sigClear(){const c=sig.c;if(!c)return;const x=c.getContext('2d');x.save();x.setTransform(1,0,0,1,0,0);x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.restore();sig.drawn=false}
-function erklaerungPDF(k,an,opt,sigUrl){const wl=opt.typ==='wlan';const doc=newPdf({unit:'mm',format:'a4'});const s=S.settings;const x=18,W=210,maxW=W-2*x;let y=18;
+function erklaerungPDF(k,an,opt,sigUrl){const wl=opt.typ==='wlan'||opt.typ==='werbung';const wb=opt.typ==='werbung';const doc=newPdf({unit:'mm',format:'a4'});const s=S.settings;const x=18,W=210,maxW=W-2*x;let y=18;
   const need=h=>{if(y+h>282){doc.addPage();y=18}};
   const para=(t,size=9.5,style='normal',gap=2)=>{doc.setFont('helvetica',style);doc.setFontSize(size);const L=doc.splitTextToSize(String(t).replace(/[„“]/g,'"'),maxW);L.forEach(l=>{need(size*.45);doc.text(l,x,y);y+=size*.45});y+=gap};
   const head=t=>{y+=1;need(12);para(t,11,'bold',0.5)};
   doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(s.firma||'SEEN Salon',x,y);y+=6;doc.setFont('helvetica','normal');doc.setFontSize(9);
   [s.inhaber,s.adresse,[s.telefon?'Tel. '+s.telefon:'',s.email].filter(Boolean).join(' · ')].filter(Boolean).forEach(l=>{doc.text(l,x,y);y+=4.3});y+=5;
-  para(wl?'Nutzungsbedingungen Gäste-WLAN':'Gesundheitsfragen und Einverständniserklärung',14,'bold',1);
-  para((wl?'Gast: ':'Kundin / Kunde: ')+kundeName(k)+(k.geburtstag&&!wl?'   ·   geboren am '+fmtDate(k.geburtstag):'')+'   ·   Datum: '+fmtDate(an.datum),10,'normal',3);
-  if(wl){para(wlanText(),9.3,'normal',2);para('[X] Ich habe die Nutzungsbedingungen gelesen und akzeptiere sie.',9.5,'normal',2);if(s.wlanSsid)para('WLAN: '+s.wlanSsid+(s.wlanPw?'   ·   Passwort: '+s.wlanPw:''),10,'bold',3)}
+  para(wb?'Einwilligung zur Verwendung von Fotos für Werbung':wl?'Nutzungsbedingungen Gäste-WLAN':'Gesundheitsfragen und Einverständniserklärung',14,'bold',1);
+  para((wl&&!wb?'Gast: ':'Kundin / Kunde: ')+kundeName(k)+(k.geburtstag&&!wl?'   ·   geboren am '+fmtDate(k.geburtstag):'')+'   ·   Datum: '+fmtDate(an.datum),10,'normal',3);
+  if(wb){para(werbungText(opt.kanaele),9.3,'normal',2);para('[X] Ich willige ein.',9.5,'normal',2)}
+  else if(wl){para(wlanText(),9.3,'normal',2);para('[X] Ich habe die Nutzungsbedingungen gelesen und akzeptiere sie.',9.5,'normal',2);if(s.wlanSsid)para('WLAN: '+s.wlanSsid+(s.wlanPw?'   ·   Passwort: '+s.wlanPw:''),10,'bold',3)}
   else{
   head('1. Gesundheitsfragen');FRAGEN.forEach(([n,q])=>{para((an[n]?'[X] JA    ':'[ ] nein  ')+'  '+q.replace(/[„“]/g,'"'),9.5,'normal',1)});
   if(an.text)para('Allergien / Anmerkungen: '+an.text,9.5,'normal',2);
@@ -1454,7 +1516,7 @@ function erklaerungPDF(k,an,opt,sigUrl){const wl=opt.typ==='wlan';const doc=newP
   try{doc.addImage(sigUrl,'JPEG',x+95,y,70,28)}catch(e){}
   doc.setDrawColor(120);doc.line(x,y+29,x+80,y+29);doc.line(x+95,y+29,W-x,y+29);
   doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text((city?city+', ':'')+fmtDate(an.datum),x,y+27);
-  doc.setFontSize(8);doc.text('Ort, Datum',x,y+33);doc.text(wl?'Unterschrift Gast':'Unterschrift Kundin / Kunde',x+95,y+33);y+=39;
+  doc.setFontSize(8);doc.text('Ort, Datum',x,y+33);doc.text(wl&&!wb?'Unterschrift Gast':'Unterschrift Kundin / Kunde',x+95,y+33);y+=39;
   doc.setFontSize(7.5);doc.setTextColor(120);doc.text((wl?'':'Diese Erklärung gilt 12 Monate. ')+'Erstellt mit SEEN Salon am '+fmtDate(today())+'.',x,Math.min(y,288));
   return doc.output('blob')}
 function allergieTestForm(k){if(!k)return;const at=k.allergietest||{};const hist=(k.allergietests||[]).slice().reverse();const ATL={ok:'unauffällig',reaktion:'Reaktion',abgelehnt:'abgelehnt'};
