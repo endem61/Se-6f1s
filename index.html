@@ -120,6 +120,11 @@ textarea{min-height:80px;resize:vertical}
 .day.today .dn{text-decoration:underline;text-underline-offset:3px}
 .appt{display:flex;gap:12px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;border-left:4px solid var(--accent)}
 .appt.erledigt{border-left-color:var(--ok);opacity:.8}
+.appt.privat{background:#fff6d6;border-left-color:#d9a400}
+.appt>.pill{margin-left:auto;align-self:center}
+.appt.extern{background:var(--surface2);border-left-color:#8a8a8a;cursor:default}
+:root[data-theme=dark] .appt.privat,.dark .appt.privat{background:#3a3214}
+@media (prefers-color-scheme:dark){.appt.privat{background:#3a3214}}
 .appt.abgesagt{border-left-color:var(--line);opacity:.55;text-decoration:line-through}
 
 .split{display:grid;gap:16px}
@@ -324,7 +329,7 @@ async function init(){
   db.doc('settings/main').onSnapshot(s=>{S.settings=s.exists?s.data():{};markLoaded('settings')});
   COLS.forEach(c=>db.collection(c).onSnapshot(q=>{derive(c,q.docs.map(d=>({id:d.id,data:d.data()})));markLoaded(c)}));
   UI.appLocked=true;renderNav();renderShell();
-  setTimeout(offeneSuchen,4000);
+  setTimeout(offeneSuchen,4000);setTimeout(()=>icsLaden(false),1500);setInterval(()=>icsLaden(false),15*60000);
   if('serviceWorker' in navigator){try{const reg=await navigator.serviceWorker.register('sw.js');
     reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)$('#update-bar').hidden=false})})}catch(e){console.warn(e)}}
 }
@@ -441,7 +446,7 @@ const BODY={
 /* ---- Heute ---- */
 heute:()=>loadingOr(()=>{
   const t=today();
-  const termine=S.termine.filter(x=>x.datum===t&&x.status!=='abgesagt').sort(byZeit);
+  const termine=[...S.termine.filter(x=>x.datum===t&&x.status!=='abgesagt'),...extTermine(t)].sort(byZeit);
   const heuteK=S.kasse.filter(k=>k.datum===t&&!isPrivat(k));
   const ein=heuteK.filter(k=>k.art==='einnahme').reduce((a,k)=>a+k.betrag,0);
   const aus=heuteK.filter(k=>k.art==='ausgabe').reduce((a,k)=>a+k.betrag,0);
@@ -468,11 +473,12 @@ heute:()=>loadingOr(()=>{
 termine:()=>loadingOr(()=>{
   const sel=UI.terminDatum;const d=parseDate(sel);const mo=addDays(sel,-((d.getDay()+6)%7));const t=today();
   const days=[...Array(7)].map((_,i)=>addDays(mo,i));
-  const week=`<div class="week">${days.map(ds=>{const c=S.termine.filter(x=>x.datum===ds&&x.status!=='abgesagt').length;const dd=parseDate(ds);
+  const week=`<div class="week">${days.map(ds=>{const c=S.termine.filter(x=>x.datum===ds&&x.status!=='abgesagt').length+extTermine(ds).length;const dd=parseDate(ds);
     return `<button class="day ${ds===t?'today':''}" data-act="t-day" data-v="${ds}" ${ds===sel?'aria-current="date"':''}><div class="wd">${dd.toLocaleDateString('de-DE',{weekday:'short'})}</div><div class="dn">${dd.getDate()}</div><div class="cnt">${c?c+' T.':ruhetage().includes(dd.getDay())?'Ruhetag':''}</div></button>`}).join('')}</div>`;
-  const list=S.termine.filter(x=>x.datum===sel).sort(byZeit);
+  const list=[...S.termine.filter(x=>x.datum===sel),...extTermine(sel)].sort(byZeit);
   return week+`<h2 style="margin-bottom:10px">${esc(fmtDateLong(sel))}</h2>`+(list.length?`<div class="grid" style="gap:8px">${list.map(x=>{const k=kundeById(x.kundeId);
-    return `<div class="appt ${x.status||''}" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><div class="time">${esc(x.zeit)}</div><div class="grow" style="min-width:0"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${esc(x.leistung||'')} · ${num(x.dauer)||30} Min${x.notiz?' · '+esc(x.notiz):''}</div></div>${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':x.status==='abgesagt'?'<span class="pill">abgesagt</span>':''}</div>`}).join('')}</div>`:`<div class="card empty">Keine Termine an diesem Tag.<br><button class="btn sm" data-act="termin-neu" style="margin-top:8px">+ Termin anlegen</button></div>`);
+    if(x.extern)return `<div class="appt extern"><div class="time">${x.ganztags?'ganzt.':esc(x.zeit)}</div><div class="grow" style="min-width:0"><div class="title">${esc(x.name)}</div><div class="small muted">📅 Privatkalender${x.ganztags?'':' · bis '+esc(x.ende)}</div></div><span class="pill">privat</span></div>`;
+    return `<div class="appt ${x.status||''} ${x.privat?'privat':''}" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><div class="time">${x.ganztags?'ganzt.':esc(x.zeit)}</div><div class="grow" style="min-width:0"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${x.privat?'Privat'+(x.ganztags?'':' · '+(num(x.dauer)||30)+' Min'):[esc(x.leistung||''),(num(x.dauer)||30)+' Min'].filter(Boolean).join(' · ')}${x.notiz?' · '+esc(x.notiz):''}</div></div>${x.privat?'<span class="pill warn">privat</span>':''}${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':x.status==='abgesagt'?'<span class="pill">abgesagt</span>':''}</div>`}).join('')}</div>`:`<div class="card empty">Keine Termine an diesem Tag.<br><button class="btn sm" data-act="termin-neu" style="margin-top:8px">+ Termin anlegen</button></div>`);
 }),
 /* ---- Kunden ---- */
 kunden:()=>loadingOr(()=>{if(UI.kundenStat)return statView();
@@ -510,6 +516,9 @@ mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px"
    <h3 style="margin-top:18px">Gäste-WLAN & Nachrichten</h3><div class="fields">${fld('wlanSsid','WLAN-Name (Gastzugang)',s.wlanSsid||'')}${fld('wlanPw','WLAN-Passwort (Gastzugang)',s.wlanPw||'')}</div>
    <div class="field"><label for="f-erinnText">Text für Terminerinnerung (WhatsApp) – Platzhalter: {vorname} {datum} {zeit} {salon}</label><textarea id="f-erinnText" name="erinnText">${esc(s.erinnText||ERINN_TEXT)}</textarea></div>
    <div class="field"><label for="f-gebText">Text für Geburtstagsgruß – Platzhalter: {vorname} {salon}</label><textarea id="f-gebText" name="gebText">${esc(s.gebText||GEB_TEXT)}</textarea></div>
+   <h3 style="margin-top:18px">Privatkalender (Outlook / iPad)</h3>
+   <div class="field"><label for="f-icsUrl">ICS-Link des Outlook-Kalenders (Outlook.com → Einstellungen → Kalender → Freigegebene Kalender → Kalender veröffentlichen → ICS)</label><input id="f-icsUrl" name="icsUrl" type="url" value="${esc(s.icsUrl||'')}" placeholder="https://outlook.live.com/owa/calendar/…/calendar.ics" autocomplete="off"></div>
+   <div class="small muted" id="ics-status">${icsStatusText()}</div>
    <h3 style="margin-top:18px">Ruhetage (Salon geschlossen)</h3><div class="chips">${[1,2,3,4,5,6,0].map(i=>`<label class="chip" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="ruhetag" value="${i}" ${ruhetage().includes(i)?'checked':''} style="accent-color:var(--accent)">${WD[i]}</label>`).join('')}</div>
    <div class="modal-foot"><button class="btn primary">Speichern</button></div></form>
   <div class="card"><h3>Speicherplatz für Fotos</h3><div id="storage-info" class="small muted">Wird gelesen …</div></div>
@@ -535,7 +544,9 @@ mehr:()=>loadingOr(()=>{if(!isAdmin())return `<div class="grid" style="gap:16px"
 function fld(name,label,val,type='text',extra=''){return `<div class="field"><label for="f-${name}">${label}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(val??'')}" ${extra}></div>`}
 function leistungRow(l){return `<div class="fields l-row" style="grid-template-columns:2fr 1fr 1fr auto;align-items:end"><input name="l-name" value="${esc(l.name)}" aria-label="Leistung" placeholder="Leistung"><input name="l-preis" value="${l.preis?eurPlain(l.preis):''}" inputmode="decimal" aria-label="Preis in Euro" placeholder="Preis €"><input name="l-dauer" type="number" min="5" step="5" value="${num(l.dauer)||30}" aria-label="Dauer in Minuten"><button type="button" class="btn sm danger" data-act="l-del" aria-label="Leistung entfernen">×</button></div>`}
 
-function apptRow(x){const k=kundeById(x.kundeId);return `<div class="row click" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><span class="time">${esc(x.zeit)}</span><div class="grow"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${esc(x.leistung||'')}</div></div>${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':`<button class="btn sm" data-act="besuch-aus-termin" data-id="${x.id}" data-doc="${x._doc}">Besuch erfassen</button>`}</div>`}
+function apptRow(x){const k=kundeById(x.kundeId);
+  if(x.extern||x.privat)return `<div class="row ${x.extern?'':'click'}" ${x.extern?'':`data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"`} style="background:${x.extern?'var(--surface2)':'#fff6d6'};border-radius:8px;padding-inline:8px"><span class="time">${x.ganztags?'ganzt.':esc(x.zeit)}</span><div class="grow"><div class="title">${esc(x.name)}</div><div class="small muted">${x.extern?'📅 Privatkalender':'Privat'}</div></div><span class="pill">privat</span></div>`;
+  return `<div class="row click" data-act="termin-open" data-id="${x.id}" data-doc="${x._doc}"><span class="time">${esc(x.zeit)}</span><div class="grow"><div class="title">${esc(k?kundeName(k):x.name||'Ohne Namen')}</div><div class="small muted">${esc(x.leistung||'')}</div></div>${x.status==='erledigt'?'<span class="pill ok">erledigt</span>':`<button class="btn sm" data-act="besuch-aus-termin" data-id="${x.id}" data-doc="${x._doc}">Besuch erfassen</button>`}</div>`}
 
 function kundeDetail(k){
   const besuche=S.besuche.filter(b=>b.kundeId===k.id).sort((a,b)=>b.datum.localeCompare(a.datum));
@@ -715,14 +726,17 @@ function kundeForm(k={}){
 function terminForm(t={},doc){
   const L=leistungen();const k=kundeById(t.kundeId);
   openModal(t.id?'Termin':'Neuer Termin',`<form data-form="termin" data-id="${t.id||''}" data-doc="${doc||''}" class="grid" style="gap:12px">
-   <div class="field"><label for="t-kunde">Kunde</label><input id="t-kunde" name="kunde" list="dl-kunden" value="${esc(k?kundeLabel(k):t.name||'')}" placeholder="Name eingeben oder auswählen" autocomplete="off">${kundenDatalist()}</div>
+   <label class="check" style="background:#fff6d6;border-radius:10px;padding:10px 12px;color:#3a2f00"><input type="checkbox" name="privat" id="t-privat" ${t.privat?'checked':''}><span><b>Privater Termin</b> (z. B. Arzt, Familie) – blockiert die Zeit, erscheint gelb, ohne Kunde und ohne Erinnerung</span></label>
+   <div class="field"><label for="t-kunde" id="t-kunde-lbl">${t.privat?'Bezeichnung':'Kunde'}</label><input id="t-kunde" name="kunde" list="dl-kunden" value="${esc(k?kundeLabel(k):t.name||'')}" placeholder="Name eingeben oder auswählen" autocomplete="off">${kundenDatalist()}</div>
    <div class="fields">${fld('datum','Datum',t.datum||UI.terminDatum,'date')}${fld('zeit','Uhrzeit',t.zeit||'09:00','time','step="300"')}
    <div class="field"><label for="t-leistung">Leistung</label><select id="t-leistung" name="leistung"><option value="">– wählen –</option>${L.map(l=>`<option data-dauer="${num(l.dauer)}" ${t.leistung===l.name?'selected':''}>${esc(l.name)}</option>`).join('')}${t.leistung&&!L.some(l=>l.name===t.leistung)?`<option selected>${esc(t.leistung)}</option>`:''}</select></div>
    ${fld('dauer','Dauer (Min)',t.dauer||30,'number','min="5" step="5"')}</div>
+   <label class="check" id="t-ganz-wrap" ${t.privat?'':'hidden'}><input type="checkbox" name="ganztags" ${t.ganztags?'checked':''}><span>Ganztägig (ganzer Tag belegt)</span></label>
    <div class="field"><label for="f-tnotiz">Notiz</label><input id="f-tnotiz" name="notiz" value="${esc(t.notiz||'')}"></div>
    ${t.id?`<div class="field"><span class="label">Status</span><div class="seg" role="group">${[['geplant','Geplant'],['erledigt','Erledigt'],['abgesagt','Abgesagt']].map(([v,l])=>`<button type="button" data-act="seg" data-name="status" data-v="${v}" aria-pressed="${(t.status||'geplant')===v}">${l}</button>`).join('')}</div><input type="hidden" name="status" value="${t.status||'geplant'}"></div>`:''}
    <div class="modal-foot">${t.id?`<button type="button" class="btn danger" data-act="termin-del" data-id="${t.id}" data-doc="${doc}" style="margin-right:auto">Löschen</button><button type="button" class="btn" data-act="besuch-aus-termin" data-id="${t.id}" data-doc="${doc}">Besuch erfassen</button>`:''}<button class="btn primary">Speichern</button></div></form>`,
-  {onMount:m=>{$('#t-leistung',m).onchange=e=>{const o=e.target.selectedOptions[0];if(o&&o.dataset.dauer)m.querySelector('[name=dauer]').value=o.dataset.dauer}}});
+  {onMount:m=>{$('#t-leistung',m).onchange=e=>{const o=e.target.selectedOptions[0];if(o&&o.dataset.dauer)m.querySelector('[name=dauer]').value=o.dataset.dauer};
+    const pv=$('#t-privat',m);const upd=()=>{$('#t-kunde-lbl',m).textContent=pv.checked?'Bezeichnung (z. B. Arzt, Elternabend)':'Kunde';$('#t-kunde',m).placeholder=pv.checked?'Was steht an?':'Name eingeben oder auswählen';$('#t-ganz-wrap',m).hidden=!pv.checked;$('#t-leistung',m).closest('.field').hidden=pv.checked};pv.onchange=upd;upd()}});
 }
 
 /* ---- Besuch (Arbeit + Fotos + Kassieren) ---- */
@@ -1123,7 +1137,7 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#scann
 /* ---------- Formulare speichern ---------- */
 const FORMS={
  async settings(f){const v=Object.fromEntries(new FormData(f));const a=parseEur(v.kasseAnfang);
-   await mutate('settings/main',d=>({...d,firma:v.firma.trim(),inhaber:v.inhaber.trim(),adresse:v.adresse.trim(),steuernummer:v.steuernummer.trim(),telefon:v.telefon.trim(),email:v.email.trim(),kasseAnfang:isNaN(a)?0:a,kasseAnfangDatum:v.kasseAnfangDatum,wlanSsid:(v.wlanSsid||'').trim(),wlanPw:(v.wlanPw||'').trim(),erinnText:(v.erinnText||'').trim()||ERINN_TEXT,gebText:(v.gebText||'').trim()||GEB_TEXT,ruhetage:new FormData(f).getAll('ruhetag').map(Number)}));toast('Einstellungen gespeichert')},
+   await mutate('settings/main',d=>({...d,firma:v.firma.trim(),inhaber:v.inhaber.trim(),adresse:v.adresse.trim(),steuernummer:v.steuernummer.trim(),telefon:v.telefon.trim(),email:v.email.trim(),kasseAnfang:isNaN(a)?0:a,kasseAnfangDatum:v.kasseAnfangDatum,icsUrl:(v.icsUrl||'').trim(),wlanSsid:(v.wlanSsid||'').trim(),wlanPw:(v.wlanPw||'').trim(),erinnText:(v.erinnText||'').trim()||ERINN_TEXT,gebText:(v.gebText||'').trim()||GEB_TEXT,ruhetage:new FormData(f).getAll('ruhetag').map(Number)}));toast('Einstellungen gespeichert');setTimeout(()=>icsLaden(true),300)},
  async wiederkehrend(f){const old=S.settings.wiederkehrend||[];const rows=$$('.wk-row',f).map((r,i)=>({id:(old[i]&&old[i].text===r.querySelector('[name=w-text]').value.trim())?old[i].id:'w'+uid(),text:r.querySelector('[name=w-text]').value.trim(),betrag:parseEur(r.querySelector('[name=w-betrag]').value)||0,kategorie:r.querySelector('[name=w-kat]').value,tag:Math.min(28,Math.max(1,num(r.querySelector('[name=w-tag]').value)||1))})).filter(w=>w.text);
    await mutate('settings/main',d=>({...d,wiederkehrend:rows}));toast('Abbuchungen gespeichert')},
  async leistungen(f){const rows=$$('.l-row',f).map((r,i)=>({id:'l'+i+uid().slice(-3),name:r.querySelector('[name=l-name]').value.trim(),preis:parseEur(r.querySelector('[name=l-preis]').value)||0,dauer:num(r.querySelector('[name=l-dauer]').value)||30})).filter(l=>l.name);
@@ -1134,11 +1148,14 @@ const FORMS={
    const keep={...old};delete keep.id;await db.doc('kunden/'+id).set({...keep,...data});UI.kundeSel=id;if(UI.view!=='kunden')go('kunden');toast('Kundenkarte gespeichert')},
  async termin(f){const v=Object.fromEntries(new FormData(f));const k=kundeFromLabel(v.kunde);
    if(!v.kunde.trim()){toast('Bitte einen Namen eingeben.');return false}
-   const t={id:f.dataset.id||uid(),kundeId:k?k.id:'',name:k?kundeName(k):v.kunde.trim(),datum:v.datum,zeit:v.zeit,dauer:num(v.dauer)||30,leistung:v.leistung,notiz:v.notiz.trim(),status:v.status||'geplant'};
+   const pv=!!v.privat,gz=pv&&!!v.ganztags;
+   const t={id:f.dataset.id||uid(),kundeId:k&&!pv?k.id:'',name:k&&!pv?kundeName(k):v.kunde.trim(),datum:v.datum,zeit:gz?'00:00':v.zeit,dauer:gz?1440:(num(v.dauer)||30),leistung:pv?'':v.leistung,notiz:v.notiz.trim(),status:v.status||'geplant',privat:pv,ganztags:gz};
    const oldDoc=f.dataset.doc,newDoc=ymOf(t.datum);
    if(oldDoc&&oldDoc!==newDoc)await mutate('termine/'+oldDoc,d=>{d.list=(d.list||[]).filter(x=>x.id!==t.id);return d});
    await mutate('termine/'+newDoc,d=>{d.list=(d.list||[]).filter(x=>x.id!==t.id);d.list.push(t);return d});
-   const clash=S.termine.some(x=>x.id!==t.id&&x.datum===t.datum&&x.status!=='abgesagt'&&overlap(x,t));
+   const clashE=extTermine(t.datum).find(x=>overlap(x,t));
+   const clash=clashE||S.termine.some(x=>x.id!==t.id&&x.datum===t.datum&&x.status!=='abgesagt'&&overlap(x,t));
+   if(clashE){toast('Gespeichert – Achtung: überschneidet sich mit „'+clashE.name+'“ im privaten Kalender.',6000);return}
    const ruhe=ruhetage().includes(parseDate(t.datum).getDay());
    toast(clash?'Gespeichert – Achtung: überschneidet sich mit einem anderen Termin.':ruhe?'Gespeichert – Hinweis: '+WD[parseDate(t.datum).getDay()]+' ist Ruhetag.':'Termin gespeichert',clash||ruhe?5000:2600)},
  async besuch(f){const v=Object.fromEntries(new FormData(f));const kundeId=f.dataset.kunde;const k=kundeById(kundeId);const neu=!f.dataset.id;
@@ -1535,8 +1552,8 @@ const letzterBesuch=kid=>S.besuche.filter(b=>b.kundeId===kid&&(b.rezeptur||(b.ma
 function rezepturUebernehmen(kid){const b=letzterBesuch(kid);if(!b)return;const t=$('#f-rezeptur');if(t&&b.rezeptur)t.value=b.rezeptur;let n=0;
   (b.material||[]).forEach(m=>{const a=S.artikel.find(x=>x.id===m.id);if(!a)return;if(pending.verbrauch.some(v=>v.id===a.id))return;const inh=artInhalt(a);pending.verbrauch.push(inh?{id:a.id,ml:num(m.ml),menge:num(m.ml)/inh}:{id:a.id,menge:num(m.menge)});n++});
   renderVerbrauch();(b.material||[]).forEach(m=>vbWarn(S.artikel.find(x=>x.id===m.id)));toast('Rezeptur vom '+fmtDate(b.datum)+' übernommen'+(n?' ('+n+' Material)':'')+' – bitte prüfen.',3500)}
-function naechsterOffen(){let d=addDays(today(),1);for(let i=0;i<7;i++){if(!ruhetage().includes(parseDate(d).getDay())&&S.termine.some(t=>t.datum===d&&t.status!=='abgesagt'))return d;d=addDays(d,1)}return addDays(today(),1)}
-function erinnerungCard(){const d=naechsterOffen();const L=S.termine.filter(t=>t.datum===d&&t.status!=='abgesagt').sort(byZeit);if(!L.length)return '';
+function naechsterOffen(){let d=addDays(today(),1);for(let i=0;i<7;i++){if(!ruhetage().includes(parseDate(d).getDay())&&S.termine.some(t=>t.datum===d&&t.status!=='abgesagt'&&!t.privat))return d;d=addDays(d,1)}return addDays(today(),1)}
+function erinnerungCard(){const d=naechsterOffen();const L=S.termine.filter(t=>t.datum===d&&t.status!=='abgesagt'&&!t.privat).sort(byZeit);if(!L.length)return '';
   return `<div class="card"><h3>Erinnern – Termine ${tageSeit(d)===-1?'morgen':fmtDateLong(d)}</h3><div class="list">${L.map(t=>{const k=kundeById(t.kundeId);const txt=fillText(S.settings.erinnText||ERINN_TEXT,{vorname:k?(k.vorname||kundeName(k)):(t.name||''),datum:parseDate(d).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'}),zeit:t.zeit,salon:salonName()});
     return `<div class="row"><span class="time">${esc(t.zeit)}</span><div class="grow"><div class="title">${esc(k?kundeName(k):t.name||'')}</div><div class="small muted">${esc(t.leistung||'')}</div></div>${t.erinnert?'<span class="pill ok">erinnert ✓</span>':''}${waBtn(k&&k.telefon,txt,`data-wa="termin" data-id="${t.id}" data-doc="${t._doc}"`,t.erinnert?'Nochmal':'WhatsApp')}</div>`}).join('')}</div></div>`}
 function gebNaechste(tage){const t=parseDate(today());const y=t.getFullYear();return S.kunden.filter(k=>k.geburtstag).map(k=>{const g=parseDate(k.geburtstag);let n=new Date(y,g.getMonth(),g.getDate());if(n<t)n=new Date(y+1,g.getMonth(),g.getDate());return {k,in:Math.round((n-t)/864e5),datum:isoDate(n)}}).filter(x=>x.in<tage).sort((a,b)=>a.in-b.in)}
@@ -1583,6 +1600,45 @@ function quittungForm(kid){const k=kundeById(kid);const L=leistungen();
    ${fld('text','Text (optional, sonst die Leistungen)','')}
    <div class="field"><span class="label">Bezahlt</span><div class="seg" role="group">${[['bar','Bar'],['karte','Karte']].map(([v,l],i)=>`<button type="button" data-act="seg" data-name="zahlart" data-v="${v}" aria-pressed="${i===0}">${l}</button>`).join('')}</div><input type="hidden" name="zahlart" value="bar"></div>
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Abbrechen</button><button class="btn primary">Quittung erstellen</button></div></form>`)}
+
+/* ================= Privatkalender (ICS, nur lesen) ================= */
+const ICS={events:[],ts:0,err:'',loading:false};
+function icsStatusText(){if(!S.settings||!S.settings.icsUrl)return 'Kein Privatkalender verbunden.';if(ICS.err)return '⚠ '+ICS.err;if(ICS.ts)return '✓ '+ICS.events.length+' private Termine geladen, Stand '+new Date(ICS.ts).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});return 'Wird geladen …'}
+function icsUnfold(t){return t.replace(/\r\n[ \t]/g,'').replace(/\n[ \t]/g,'')}
+function icsVal(s){return s.replace(/\\n/gi,' ').replace(/\\,/g,',').replace(/\;/g,';').replace(/\\\\/g,'\\')}
+function icsDate(v,params){const allday=/VALUE=DATE(?!-)/.test(params)||/^\d{8}$/.test(v);const m=v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);if(!m)return null;
+  let d;if(m[7])d=new Date(Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5]));else d=new Date(+m[1],m[2]-1,+m[3],+(m[4]||0),+(m[5]||0));return {d,allday}}
+function icsParse(txt,von,bis){const out=[];const lines=icsUnfold(txt).split(/\r?\n/);let ev=null;
+  for(const ln of lines){if(ln==='BEGIN:VEVENT'){ev={ex:[]};continue}if(ln==='END:VEVENT'){if(ev&&ev.start)icsExpand(ev,von,bis,out);ev=null;continue}if(!ev)continue;
+    const i=ln.indexOf(':');if(i<0)continue;const key=ln.slice(0,i),val=ln.slice(i+1);const [name,...pp]=key.split(';');const params=pp.join(';');
+    if(name==='DTSTART')ev.start=icsDate(val,params);else if(name==='DTEND')ev.end=icsDate(val,params);else if(name==='DURATION')ev.dur=val;else if(name==='SUMMARY')ev.sum=icsVal(val);
+    else if(name==='RRULE')ev.rrule=val;else if(name==='EXDATE')val.split(',').forEach(x=>{const r=icsDate(x,params);if(r)ev.ex.push(isoDate(r.d))});else if(name==='STATUS')ev.status=val;else if(name==='RECURRENCE-ID')ev.recid=icsDate(val,params);else if(name==='UID')ev.uid=val;else if(name==='TRANSP')ev.transp=val}
+  const ov=new Set(out.filter(e=>e.recid).map(e=>e.uid+'|'+e.recid));return out.filter(e=>e.recid||!ov.has(e.uid+'|'+e.datum))}
+function icsExpand(ev,von,bis,out){if(ev.status==='CANCELLED')return;const s=ev.start.d;let lenMs=ev.end?ev.end.d-s:(ev.start.allday?864e5:30*60000);
+  if(ev.dur){const m=ev.dur.match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?/);if(m)lenMs=((+m[1]||0)*1440+(+m[2]||0)*60+(+m[3]||0))*60000}
+  const push=d=>{const ds=isoDate(d);if(ds<von||ds>bis||ev.ex.includes(ds))return;const ad=ev.start.allday;const days=ad?Math.max(1,Math.round(lenMs/864e5)):1;
+    for(let i=0;i<days;i++){const dd=addDays(ds,i);if(dd<von||dd>bis)continue;const e=new Date(d.getTime()+lenMs);
+      out.push({extern:true,uid:ev.uid,recid:ev.recid?isoDate(ev.recid.d):'',datum:dd,zeit:ad?'00:00':pad(d.getHours())+':'+pad(d.getMinutes()),ende:ad?'':pad(e.getHours())+':'+pad(e.getMinutes()),dauer:ad?1440:Math.max(5,Math.round(lenMs/60000)),ganztags:ad,name:ev.sum||'Privat',status:''})}};
+  if(!ev.rrule){push(s);return}
+  const R={};ev.rrule.split(';').forEach(p=>{const [k,v]=p.split('=');R[k]=v});const iv=+R.INTERVAL||1;const cnt=+R.COUNT||0;const until=R.UNTIL?icsDate(R.UNTIL,'').d:null;
+  const BD={SU:0,MO:1,TU:2,WE:3,TH:4,FR:5,SA:6};const byday=R.BYDAY?R.BYDAY.split(',').map(x=>x.slice(-2)):null;let n=0;
+  const stop=d=>(until&&d>until)||(cnt&&n>=cnt)||isoDate(d)>bis;
+  if(R.FREQ==='DAILY'){for(let d=new Date(s);!stop(d);d.setDate(d.getDate()+iv)){n++;push(new Date(d))}}
+  else if(R.FREQ==='WEEKLY'){const days=byday?byday.map(x=>BD[x]):[s.getDay()];const wk=new Date(s);wk.setDate(wk.getDate()-((wk.getDay()+6)%7));
+    for(let w=0;w<600;w++){for(const dw of days.slice().sort((a,b)=>((a+6)%7)-((b+6)%7))){const d=new Date(wk);d.setDate(wk.getDate()+((dw+6)%7));d.setHours(s.getHours(),s.getMinutes(),0,0);if(d<s)continue;if(stop(d))return;n++;push(d)}wk.setDate(wk.getDate()+7*iv)}}
+  else if(R.FREQ==='MONTHLY'){for(let i=0;i<600;i++){const d=new Date(s);d.setMonth(s.getMonth()+i*iv);
+      if(byday&&R.BYDAY){const m=R.BYDAY.match(/^(-?\d)?([A-Z]{2})$/);if(m){const pos=+(m[1]||1),dw=BD[m[2]];const first=new Date(d.getFullYear(),d.getMonth(),1,s.getHours(),s.getMinutes());let c=[];for(let x=new Date(first);x.getMonth()===first.getMonth();x.setDate(x.getDate()+1))if(x.getDay()===dw)c.push(new Date(x));const t=pos>0?c[pos-1]:c[c.length+pos];if(!t)continue;if(stop(t))return;n++;push(t);continue}}
+      if(d.getDate()!==s.getDate())continue;if(stop(d))return;n++;push(d)}}
+  else if(R.FREQ==='YEARLY'){for(let i=0;i<200;i++){const d=new Date(s);d.setFullYear(s.getFullYear()+i*iv);if(stop(d))return;n++;push(d)}}
+  else push(s)}
+function extTermine(ds){return ICS.events.filter(e=>e.datum===ds)}
+async function icsLaden(force){const url=S.settings&&S.settings.icsUrl;if(!url){ICS.events=[];ICS.err='';return}
+  if(!ICS.ts){const c=await IDB.get('meta','icsCache').catch(()=>null);if(c&&c.url===url){ICS.events=c.events;ICS.ts=c.ts;renderBody()}}
+  if(ICS.loading||(!force&&Date.now()-ICS.ts<10*60000)||!navigator.onLine)return;ICS.loading=true;
+  try{const u=url.replace(/^webcals?:\/\//i,'https://');const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const txt=await r.text();if(!/BEGIN:VCALENDAR/.test(txt))throw new Error('keine Kalenderdatei');
+    const von=addDays(today(),-14),bis=addDays(today(),120);ICS.events=icsParse(txt,von,bis);ICS.ts=Date.now();ICS.err='';await IDB.put('meta','icsCache',{url,ts:ICS.ts,events:ICS.events}).catch(()=>{})}
+  catch(e){ICS.err=(e instanceof TypeError)?'Der Kalender konnte nicht direkt gelesen werden (Outlook erlaubt den Zugriff aus der App nicht oder kein Internet). Angezeigt wird der letzte Stand.':'Kalender konnte nicht geladen werden: '+e.message}
+  finally{ICS.loading=false;const st=$('#ics-status');if(st)st.textContent=icsStatusText();if(UI.view==='termine'||UI.view==='heute')renderBody()}}
 
 /* ================= Serien-Scan: Wareneingang / Verbrauch ================= */
 function serieStart(mode,beleg){UI.serie={mode,beleg:beleg||'',items:[]};UI.lastBooking=null;go('lager')}
